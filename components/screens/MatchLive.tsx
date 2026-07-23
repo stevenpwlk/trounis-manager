@@ -7,6 +7,7 @@ import { MatchSession, type MatchResult } from "../../src/engine/match";
 import { createRng } from "../../src/engine/rng";
 import { DEFAULT_CONSIGNES } from "../../src/data/types";
 import type { Consignes, Tempo, Ciblage, DisciplineConsigne } from "../../src/data/types";
+import Crest from "../Crest";
 
 function eventLabel(ev: { kind: string; side: string | null; homeDelta: number; awayDelta: number; period: number }): string {
   switch (ev.kind) {
@@ -86,6 +87,12 @@ export default function MatchLive({
     setShowConsignesPanel("timeout");
   }
 
+  function simulateToEnd() {
+    while (!session.isFinished()) session.playNextPeriod();
+    setShowConsignesPanel(null);
+    forceUpdate((n) => n + 1);
+  }
+
   const score = session.getScore();
   const canTimeout = !timeoutUsed && session.period >= 2 && session.period <= 3 && !session.isFinished();
 
@@ -97,12 +104,12 @@ export default function MatchLive({
       </div>
 
       <div className="scorebug">
-        <div className="scorebug__team"><span className="crest-badge">{isHome ? club.code : opponent.code}</span><span className="scorebug__name">{isHome ? club.code : opponent.code}</span></div>
+        <div className="scorebug__team"><Crest code={isHome ? club.code : opponent.code} /><span className="scorebug__name">{isHome ? club.code : opponent.code}</span></div>
         <div style={{ textAlign: "center" }}>
           <div><span className="scorebug__score">{score.home}</span>–<span className="scorebug__score">{score.away}</span></div>
           <span className="scorebug__period">{session.isFinished() ? "Terminé" : session.period === 0 ? "Avant-match" : `Période ${session.period}`}</span>
         </div>
-        <div className="scorebug__team right"><span className="crest-badge">{isHome ? opponent.code : club.code}</span><span className="scorebug__name">{isHome ? opponent.code : club.code}</span></div>
+        <div className="scorebug__team right"><Crest code={isHome ? opponent.code : club.code} /><span className="scorebug__name">{isHome ? opponent.code : club.code}</span></div>
       </div>
 
       {showConsignesPanel && (
@@ -141,10 +148,15 @@ export default function MatchLive({
         {!session.isFinished() && !showConsignesPanel && (
           <button className="btn btn--primary" onClick={next}>▶ Événement suivant</button>
         )}
-        {!session.isFinished() && (
-          <button className="btn btn--ghost" disabled={!canTimeout} onClick={useTimeout}>
-            Temps mort {timeoutUsed ? "(utilisé)" : "(1 disponible)"}
-          </button>
+        {!session.isFinished() && !showConsignesPanel && (
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn btn--ghost btn--sm" style={{ flex: 1 }} disabled={!canTimeout} onClick={useTimeout}>
+              Temps mort {timeoutUsed ? "(utilisé)" : "(1 disponible)"}
+            </button>
+            <button className="btn btn--ghost btn--sm" style={{ flex: 1 }} onClick={simulateToEnd}>
+              Simuler la fin »
+            </button>
+          </div>
         )}
         {session.isFinished() && (
           <button className="btn btn--primary" onClick={() => onFinished(opponentCode, session.getResult())}>

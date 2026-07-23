@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Onboarding from "./screens/Onboarding";
 import RosterScreen from "./screens/RosterScreen";
 import PlayerScreen from "./screens/PlayerScreen";
@@ -13,8 +13,9 @@ import SeasonEnd from "./screens/SeasonEnd";
 import { DashboardIcon, RosterIcon, MatchIcon, MercatoIcon, PlusIcon } from "./icons";
 import { useToast } from "./useToast";
 import { FORMATION_LABELS } from "./trait-labels";
+import Crest from "./Crest";
 import { getClub } from "../src/data/clubs";
-import { createNewGame, currentFixture, currentFormation, type GameState } from "../lib/game";
+import { createNewGame, currentFixture, currentFormation, saveGame, loadGame, clearSavedGame, type GameState } from "../lib/game";
 import type { Consignes, FormationId } from "../src/data/types";
 import type { MatchResult } from "../src/engine/match";
 
@@ -32,10 +33,35 @@ export default function GameApp() {
   const [game, setGame] = useState<GameState | null>(null);
   const [tab, setTab] = useState<Tab>("dashboard");
   const [sub, setSub] = useState<SubScreen>(null);
+  const [resumeChecked, setResumeChecked] = useState(false);
   const { message, toast } = useToast();
+
+  // Filet de sécurité local (§2 du plan d'affinage P2) : au premier montage côté client,
+  // reprend une partie sauvegardée s'il y en a une. Fait exprès en effet (pas en initializer
+  // useState) pour éviter un mismatch d'hydratation SSR (le serveur n'a pas de localStorage).
+  useEffect(() => {
+    const loaded = loadGame();
+    if (loaded) setGame(loaded);
+    setResumeChecked(true);
+  }, []);
+
+  useEffect(() => {
+    if (game) saveGame(game);
+  }, [game]);
 
   function updateGame(updater: (g: GameState) => GameState) {
     setGame((prev) => (prev ? updater(prev) : prev));
+  }
+
+  function newWorld() {
+    clearSavedGame();
+    setGame(null);
+    setTab("dashboard");
+    setSub(null);
+  }
+
+  if (!resumeChecked) {
+    return <div className="app-shell" />;
   }
 
   if (!game) {
@@ -63,11 +89,15 @@ export default function GameApp() {
   return (
     <div className="app-shell">
       {sub === null && tab === "dashboard" && (
-        <Dashboard
-          game={game}
-          onOpenLineup={() => setSub({ type: "lineup" })}
-          onOpenTraining={() => setSub({ type: "training" })}
-        />
+        game.seasonReport ? (
+          <SeasonEnd game={game} />
+        ) : (
+          <Dashboard
+            game={game}
+            onOpenLineup={() => setSub({ type: "lineup" })}
+            onOpenTraining={() => setSub({ type: "training" })}
+          />
+        )
       )}
       {sub === null && tab === "roster" && (
         <RosterScreen game={game} onOpenPlayer={(id) => setSub({ type: "player", id })} onOpenTraining={() => setSub({ type: "training" })} />
@@ -76,7 +106,7 @@ export default function GameApp() {
         <MatchPreview game={game} onOpenLineup={() => setSub({ type: "lineup" })} />
       )}
       {sub === null && tab === "mercato" && <MercatoScreen game={game} setGame={updateGame} toast={toast} />}
-      {sub === null && tab === "plus" && <PlusScreen />}
+      {sub === null && tab === "plus" && <PlusScreen game={game} onNewWorld={newWorld} />}
 
       {sub?.type === "player" && (
         <PlayerScreen game={game} tireurId={sub.id} onBack={() => setSub(null)} />
@@ -158,7 +188,7 @@ function Dashboard({ game, onOpenLineup, onOpenTraining }: { game: GameState; on
     <section className="screen">
       <div className="row" style={{ marginBottom: 16 }}>
         <div className="row" style={{ gap: 10 }}>
-          <span className="crest-badge lg">{club.code}</span>
+          <Crest code={club.code} size="lg" />
           <div>
             <div style={{ fontFamily: "var(--display)", fontWeight: 700, fontSize: "1.02rem" }}>{club.name}</div>
             <div style={{ fontSize: ".7rem", color: "var(--text-dim)" }}>{game.league === "L1" ? "Ligue 1 Connetable" : "Ligue 2 Capitaine Cook"} · Journée {Math.min(game.journee, 18)}/18</div>
@@ -203,12 +233,51 @@ function Dashboard({ game, onOpenLineup, onOpenTraining }: { game: GameState; on
   );
 }
 
-function PlusScreen() {
+function PlusScreen({ game, onNewWorld }: { game: GameState; onNewWorld: () => void }) {
+  const [confirming, setConfirming] = useState(false);
   return (
     <section className="screen">
       <span className="eyebrow-label">Bureau des Entraîneurs</span>
       <h1 className="screen-title">Plus</h1>
-      <p className="screen-sub">Gazette, Panthéon et profil manager arrivent avec P3 (le monde persistant multi-saisons) — cette maquette P2 se concentre sur la boucle d'une saison.</p>
+      <p className="screen-sub">Panthéon et profil manager arrivent avec P3 (le monde persistant multi-saisons) — cette maquette P2 se concentre sur la boucle d'une saison.</p>
+
+      <div className="panel">
+        <h3>Gazette du Bassin</h3>
+        {game.depeches.length === 0 ? (
+          <p style={{ fontSize: ".78rem", color: "var(--text-dim)", margin: 0 }}>
+            Aucune dépêche pour l'instant — le Bureau publiera ses premières notes après votre premier match.
+          </p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+            {game.depeches.map((d) => (
+              <div key={d.id} className={`feed-ev ${d.family === "gazette" ? "milestone" : "home"}`}>
+                <span className="feed-ev__time">J{d.journee}</span>
+                {d.text}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="panel">
+        <h3>Sauvegarde locale</h3>
+        <p style={{ fontSize: ".78rem", color: "var(--text-dim)", marginBottom: 12 }}>
+          Votre monde est sauvegardé automatiquement dans ce navigateur à chaque journée.
+        </p>
+        {!confirming ? (
+          <button className="btn btn--ghost" onClick={() => setConfirming(true)}>Recommencer un nouveau monde</button>
+        ) : (
+          <>
+            <p style={{ fontSize: ".78rem", color: "var(--danger)", marginBottom: 12 }}>
+              Cela efface définitivement la saison en cours. Confirmer ?
+            </p>
+            <div className="sheet-actions">
+              <button className="btn btn--primary btn--sm" onClick={onNewWorld}>Oui, tout effacer</button>
+              <button className="btn btn--ghost btn--sm" onClick={() => setConfirming(false)}>Annuler</button>
+            </div>
+          </>
+        )}
+      </div>
     </section>
   );
 }

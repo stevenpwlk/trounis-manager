@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { CLUBS } from "../../src/data/clubs";
+import Crest from "../Crest";
 
 const RECOMMENDED = new Set(["CCG", "PAP", "ABR"]);
 
@@ -26,7 +27,7 @@ export default function Onboarding({ onStart }: { onStart: (worldName: string, c
       <div className="panel" style={{ padding: "4px 15px" }}>
         {clubs.map((club) => (
           <button key={club.code} className="list-row" onClick={() => onStart(worldName.trim() || "Mon monde", club.code)}>
-            <span className="crest-badge">{club.code}</span>
+            <Crest code={club.code} />
             <span className="list-row__body">
               <span className="list-row__title">
                 {club.name}

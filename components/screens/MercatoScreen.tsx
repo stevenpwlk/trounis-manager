@@ -5,6 +5,7 @@ import { getClub, CLUBS } from "../../src/data/clubs";
 import { tireurValue, proposeBuy, sellPrice, type OfferResult } from "../../src/engine/mercato";
 import { createRng } from "../../src/engine/rng";
 import type { Tireur } from "../../src/data/types";
+import Crest from "../Crest";
 
 const RICH_THRESHOLD = 800;
 
@@ -109,41 +110,49 @@ export default function MercatoScreen({
         </div>
       </div>
 
-      {offerFor && (
-        <div className="dossier" style={{ marginBottom: 14 }}>
-          <div className="dossier__ref">OFFRE — {getClub(offerFor.clubCode).name}</div>
-          <h3>{offerFor.tireur.name}</h3>
-          <p>Valeur estimée : {tireurValue(offerFor.tireur)} Ⱥ</p>
-          {pendingCounter === null ? (
-            <>
-              <input
-                className="text-input"
-                type="number"
-                value={offerAmount}
-                onChange={(e) => setOfferAmount(Number(e.target.value))}
-              />
-              <div className="sheet-actions" style={{ display: "flex", gap: 9 }}>
-                <button className="btn btn--primary btn--sm" onClick={submitOffer}>Proposer</button>
-                <button className="btn btn--ghost btn--sm" onClick={() => setOfferFor(null)}>Annuler</button>
-              </div>
-            </>
-          ) : (
-            <>
-              <p>Contre-offre du club : <strong>{pendingCounter} Ⱥ</strong> (à prendre ou à laisser).</p>
-              <div style={{ display: "flex", gap: 9 }}>
-                <button className="btn btn--primary btn--sm" onClick={() => finalizeBuy(offerFor, pendingCounter)}>Accepter</button>
-                <button className="btn btn--ghost btn--sm" onClick={() => setOfferFor(null)}>Refuser</button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
+      <div className={`overlay ${offerFor ? "active" : ""}`} onClick={() => setOfferFor(null)}>
+        {offerFor && (
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <Crest code={offerFor.clubCode} />
+              <span className="eyebrow" style={{ marginBottom: 0 }}>Offre — {getClub(offerFor.clubCode).name}</span>
+            </div>
+            <h3>{offerFor.tireur.name}</h3>
+            <p>Valeur estimée : {tireurValue(offerFor.tireur)} Ⱥ</p>
+            {pendingCounter === null ? (
+              <>
+                <input
+                  className="text-input"
+                  type="number"
+                  value={offerAmount}
+                  onChange={(e) => setOfferAmount(Number(e.target.value))}
+                />
+                <div className="sheet-actions">
+                  <button className="btn btn--primary btn--sm" onClick={submitOffer}>Proposer</button>
+                  <button className="btn btn--ghost btn--sm" onClick={() => setOfferFor(null)}>Annuler</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p>Contre-offre du club : <strong>{pendingCounter} Ⱥ</strong> (à prendre ou à laisser).</p>
+                <div className="sheet-actions">
+                  <button className="btn btn--primary btn--sm" onClick={() => finalizeBuy(offerFor, pendingCounter)}>Accepter</button>
+                  <button className="btn btn--ghost btn--sm" onClick={() => setOfferFor(null)}>Refuser</button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="panel">
         <h3>Joueurs disponibles (autres clubs)</h3>
         {candidates.map((c, i) => (
           <div className="row" key={i}>
-            <span style={{ fontSize: ".78rem" }}>{c.tireur.name} ({getClub(c.clubCode).name})</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: ".78rem" }}>
+              <Crest code={c.clubCode} size="sm" />
+              {c.tireur.name} ({getClub(c.clubCode).name})
+            </span>
             <button className="btn btn--ghost btn--sm" onClick={() => openOffer(c)}>Proposer</button>
           </div>
         ))}

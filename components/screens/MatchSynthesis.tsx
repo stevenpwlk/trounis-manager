@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { GameState } from "../../lib/game";
-import { advanceJournee, currentFixture, recordPlayerMatch, simulateAiMatchesForJournee, applyWeeklyConditioning } from "../../lib/game";
+import { advanceJournee, currentFixture, recordPlayerMatch, simulateAiMatchesForJournee, simulateOtherLeagueJournee, applyWeeklyConditioning, generateDepechesForJournee, applyAiWeeklyTraining } from "../../lib/game";
 import { getClub } from "../../src/data/clubs";
 import type { MatchResult } from "../../src/engine/match";
+import Crest from "../Crest";
 
 export default function MatchSynthesis({
   game,
@@ -20,7 +21,6 @@ export default function MatchSynthesis({
   lineupIds: string[];
   onDone: (seasonFinished: boolean) => void;
 }) {
-  const [seasonFinished, setSeasonFinished] = useState(false);
   const applied = useRef(false);
 
   // Frozen at mount: `game` is still the parent's state, but the effect below
@@ -39,18 +39,26 @@ export default function MatchSynthesis({
     const away = isHome ? opponent : game.clubCode;
 
     setGame((g) => {
-      let next = simulateAiMatchesForJournee(g, g.journee);
+      let next = applyAiWeeklyTraining(g);
+      next = simulateAiMatchesForJournee(next, next.journee);
+      next = simulateOtherLeagueJournee(next, next.journee);
       next = recordPlayerMatch(next, home, away, result);
       const roster = next.rosters[g.clubCode]!;
       const playedLineup = roster.filter((t) => lineupIds.includes(t.id));
       applyWeeklyConditioning(roster, playedLineup, g.restedTireurId, `${g.seed}-conditioning-${g.journee}`);
+      const newDepeches = generateDepechesForJournee(next, result, opponent);
+      next = { ...next, depeches: [...newDepeches, ...next.depeches].slice(0, 40) };
       next = advanceJournee(next);
-      if (next.journee > 18) setSeasonFinished(true);
       return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Dérivé du game prop courant plutôt que d'un state local : après que l'effet
+  // ci-dessus a fait avancer journee via setGame, le re-rendu du parent transmet
+  // le game déjà à jour. Éviter un setState-dans-un-updater (anti-pattern React :
+  // les fonctions passées à setGame doivent rester pures, sans effet de bord).
+  const seasonFinished = game.journee > 18;
   const club = getClub(game.clubCode);
   const opp = getClub(opponent);
   const dominantPeriod = [...result.periods].sort((a, b) => Math.abs(b.home - b.away) - Math.abs(a.home - a.away))[0];
@@ -61,12 +69,12 @@ export default function MatchSynthesis({
       <h1 className="screen-title">Synthèse du match</h1>
 
       <div className="scorebug">
-        <div className="scorebug__team"><span className="crest-badge">{isHome ? club.code : opp.code}</span><span className="scorebug__name">{isHome ? club.code : opp.code}</span></div>
+        <div className="scorebug__team"><Crest code={isHome ? club.code : opp.code} /><span className="scorebug__name">{isHome ? club.code : opp.code}</span></div>
         <div style={{ textAlign: "center" }}>
           <span className="scorebug__score">{result.homeScore}</span>–<span className="scorebug__score">{result.awayScore}</span>
           <span className="scorebug__period">{result.homeScore === result.awayScore ? "Nul" : "Terminé"}</span>
         </div>
-        <div className="scorebug__team right"><span className="crest-badge">{isHome ? opp.code : club.code}</span><span className="scorebug__name">{isHome ? opp.code : club.code}</span></div>
+        <div className="scorebug__team right"><Crest code={isHome ? opp.code : club.code} /><span className="scorebug__name">{isHome ? opp.code : club.code}</span></div>
       </div>
 
       <div className="panel">

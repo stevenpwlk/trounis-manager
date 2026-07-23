@@ -34,13 +34,13 @@ export default function PlayerScreen({ game, tireurId, onBack }: { game: GameSta
 
       <div className="panel">
         <h3>Radar des attributs</h3>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <div className="radar-wrap">
           <RadarChart attrs={t.attrs} />
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+          <div className="radar-legend">
             {ATTR_KEYS.map((k) => (
-              <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: ".72rem" }}>
-                <span>{ATTR_LABELS[k]}</span>
-                <span style={{ fontFamily: "var(--data)", fontWeight: 700, color: "var(--gold-bright)" }}>{Math.round(t.attrs[k])}</span>
+              <div className="radar-legend__item" key={k}>
+                <span><span className="radar-legend__dot" />{ATTR_LABELS[k]}</span>
+                <span className="radar-legend__val">{Math.round(t.attrs[k])}</span>
               </div>
             ))}
           </div>

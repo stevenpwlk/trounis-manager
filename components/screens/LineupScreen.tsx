@@ -7,7 +7,7 @@ import { SLOTS_BY_FORMATION } from "../../src/engine/formations";
 import { pickLineup } from "../../src/engine/match";
 import { DEFAULT_CONSIGNES } from "../../src/data/types";
 import type { Consignes, Tempo, Ciblage, DisciplineConsigne } from "../../src/data/types";
-import { FORMATION_LABELS } from "../trait-labels";
+import { FORMATION_LABELS, BASSIN_LABELS } from "../trait-labels";
 
 export default function LineupScreen({
   game,
@@ -54,9 +54,9 @@ export default function LineupScreen({
 
       <div className="dossier" style={{ marginBottom: 14 }}>
         <div className="dossier__ref">FICHE DE BASSIN</div>
-        <div className="row"><span>Salinité</span><span className="pill pill--muted">{bassin.salinite}</span></div>
-        <div className="row"><span>Paprika</span><span className="pill pill--warn">{bassin.paprika}</span></div>
-        <div className="row"><span>Risque marin</span><span className="pill pill--ok">{bassin.risqueMarin}</span></div>
+        <div className="row"><span>Salinité</span><span className="pill pill--muted">{BASSIN_LABELS[bassin.salinite]}</span></div>
+        <div className="row"><span>Paprika</span><span className="pill pill--warn">{BASSIN_LABELS[bassin.paprika]}</span></div>
+        <div className="row"><span>Risque marin</span><span className="pill pill--ok">{BASSIN_LABELS[bassin.risqueMarin]}</span></div>
       </div>
 
       <div className="panel">

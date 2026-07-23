@@ -1,6 +1,8 @@
 "use client";
 import type { GameState } from "../../lib/game";
 import { TRAIT_LABELS } from "../trait-labels";
+import { getClub } from "../../src/data/clubs";
+import Crest from "../Crest";
 
 export default function RosterScreen({
   game,
@@ -13,11 +15,15 @@ export default function RosterScreen({
 }) {
   const roster = game.rosters[game.clubCode]!;
   const sorted = [...roster].sort((a, b) => b.isStar === a.isStar ? 0 : b.isStar ? 1 : -1);
+  const club = getClub(game.clubCode);
 
   return (
     <section className="screen">
       <span className="eyebrow-label">Effectif</span>
-      <h1 className="screen-title">{roster.length} tireurs homologués</h1>
+      <div className="row" style={{ marginBottom: 10, justifyContent: "flex-start", gap: 10 }}>
+        <Crest code={club.code} />
+        <h1 className="screen-title" style={{ margin: 0 }}>{roster.length} tireurs homologués</h1>
+      </div>
       <p className="screen-sub">Plancher 8, plafond 10.</p>
 
       <div className="dossier" style={{ marginBottom: 16 }}>

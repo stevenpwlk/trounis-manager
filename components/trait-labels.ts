@@ -43,3 +43,12 @@ export const FORMATION_LABELS: Record<FormationId, string> = {
   libre: "Libre",
   "carre-cercle": "Carré-en-cercle",
 };
+
+/** Libellés affichés des niveaux de conditions de bassin (identifiants internes sans accent). */
+export const BASSIN_LABELS: Record<string, string> = {
+  faible: "Faible",
+  moyenne: "Moyenne",
+  moyen: "Moyen",
+  elevee: "Élevée",
+  eleve: "Élevé",
+};
