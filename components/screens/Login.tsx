@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { getSupabaseBrowserClient } from "../../lib/supabase/client";
 
-export default function Login({ onLoggedIn, onCancel }: { onLoggedIn: () => void; onCancel: () => void }) {
+export default function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -27,10 +27,12 @@ export default function Login({ onLoggedIn, onCancel }: { onLoggedIn: () => void
   }
 
   return (
-    <div className="panel">
-      <h3>Connexion</h3>
-      <p style={{ fontSize: ".78rem", color: "var(--text-dim)", marginBottom: 12 }}>
-        Utilisez votre compte Trounis existant (le même que sur les pronos et Cavity Game).
+    <section className="screen">
+      <span className="eyebrow-label">Bureau des Entraîneurs — F.I.S.T.</span>
+      <h1 className="screen-title">Connexion</h1>
+      <p className="screen-sub">
+        Trounis Manager vit désormais entièrement en ligne — connectez-vous avec votre compte
+        Trounis existant (le même que sur les pronos et Cavity Game) pour accéder à vos mondes.
       </p>
 
       <form onSubmit={submit}>
@@ -39,17 +41,17 @@ export default function Login({ onLoggedIn, onCancel }: { onLoggedIn: () => void
         <label className="field-label">Mot de passe</label>
         <input className="text-input" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
         {error && <p style={{ fontSize: ".78rem", color: "var(--danger)", marginTop: -6, marginBottom: 14 }}>{error}</p>}
-        <div className="sheet-actions">
-          <button className="btn btn--primary btn--sm" type="submit" disabled={loading}>
-            {loading ? "Connexion…" : "Se connecter"}
-          </button>
-          <button className="btn btn--ghost btn--sm" type="button" onClick={onCancel}>Annuler</button>
-        </div>
+        <button className="btn btn--primary" type="submit" disabled={loading}>
+          {loading ? "Connexion…" : "Se connecter"}
+        </button>
       </form>
 
-      <p style={{ fontSize: ".72rem", color: "var(--text-dim)", marginTop: 14, marginBottom: 0 }}>
-        Pas encore de compte ? Les comptes se créent via une invitation sur trounis.fr.
-      </p>
-    </div>
+      <div className="panel" style={{ marginTop: 16 }}>
+        <p style={{ fontSize: ".78rem", color: "var(--text-dim)", margin: 0 }}>
+          Pas encore de compte ? Les comptes se créent via une invitation sur trounis.fr — Trounis
+          Manager réutilise le même Bureau des identités que le reste de l'écosystème.
+        </p>
+      </div>
+    </section>
   );
 }

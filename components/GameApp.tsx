@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import Onboarding from "./screens/Onboarding";
+import type { Session } from "@supabase/supabase-js";
+import Login from "./screens/Login";
+import WorldSelect from "./screens/WorldSelect";
 import RosterScreen from "./screens/RosterScreen";
 import PlayerScreen from "./screens/PlayerScreen";
 import TrainingScreen from "./screens/TrainingScreen";
@@ -10,13 +12,14 @@ import MatchLive from "./screens/MatchLive";
 import MatchSynthesis from "./screens/MatchSynthesis";
 import MercatoScreen from "./screens/MercatoScreen";
 import SeasonEnd from "./screens/SeasonEnd";
-import CloudPanel from "./screens/CloudPanel";
 import { DashboardIcon, RosterIcon, MatchIcon, MercatoIcon, PlusIcon } from "./icons";
 import { useToast } from "./useToast";
 import { FORMATION_LABELS } from "./trait-labels";
 import Crest from "./Crest";
 import { getClub } from "../src/data/clubs";
-import { createNewGame, currentFixture, currentFormation, saveGame, loadGame, clearSavedGame, type GameState } from "../lib/game";
+import { getSupabaseBrowserClient } from "../lib/supabase/client";
+import { saveCloudSlot } from "../lib/supabase/saves";
+import { currentFixture, currentFormation, type GameState } from "../lib/game";
 import type { Consignes, FormationId } from "../src/data/types";
 import type { MatchResult } from "../src/engine/match";
 
@@ -31,47 +34,73 @@ type SubScreen =
   | null;
 
 export default function GameApp() {
+  const [authChecked, setAuthChecked] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [activeSlot, setActiveSlot] = useState<number | null>(null);
   const [game, setGame] = useState<GameState | null>(null);
   const [tab, setTab] = useState<Tab>("dashboard");
   const [sub, setSub] = useState<SubScreen>(null);
-  const [resumeChecked, setResumeChecked] = useState(false);
   const { message, toast } = useToast();
 
-  // Filet de sécurité local (§2 du plan d'affinage P2) : au premier montage côté client,
-  // reprend une partie sauvegardée s'il y en a une. Fait exprès en effet (pas en initializer
-  // useState) pour éviter un mismatch d'hydratation SSR (le serveur n'a pas de localStorage).
+  // Trounis Manager vit entièrement en ligne : connexion obligatoire, l'état de jeu n'existe
+  // que dans manager_saves (pas de filet local — décision explicite avec Steven le 2026-07-23,
+  // qui remplace le premier jet "autosave localStorage" pour rester cohérent avec le reste de
+  // l'écosystème "tout en ligne").
   useEffect(() => {
-    const loaded = loadGame();
-    if (loaded) setGame(loaded);
-    setResumeChecked(true);
+    const client = getSupabaseBrowserClient();
+    if (!client) {
+      setAuthChecked(true);
+      return;
+    }
+    client.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
+      setUserId(data.session?.user.id ?? null);
+      setAuthChecked(true);
+    });
+    const { data: authSub } = client.auth.onAuthStateChange((_event: string, session: Session | null) => {
+      setUserId(session?.user.id ?? null);
+      if (!session) {
+        setActiveSlot(null);
+        setGame(null);
+      }
+    });
+    return () => authSub.subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    if (game) saveGame(game);
+    if (userId && activeSlot && game) saveCloudSlot(userId, activeSlot, game);
   }, [game]);
 
   function updateGame(updater: (g: GameState) => GameState) {
     setGame((prev) => (prev ? updater(prev) : prev));
   }
 
-  function newWorld() {
-    clearSavedGame();
+  function backToWorldSelect() {
+    setActiveSlot(null);
     setGame(null);
     setTab("dashboard");
     setSub(null);
   }
 
-  if (!resumeChecked) {
+  if (!authChecked) {
     return <div className="app-shell" />;
   }
 
-  if (!game) {
+  if (!userId) {
     return (
       <div className="app-shell">
-        <Onboarding
-          onStart={(worldName, clubCode) => {
-            const seed = `${worldName}-${clubCode}-${Date.now()}`;
-            setGame(createNewGame(worldName, clubCode, seed));
+        <Login onLoggedIn={() => {}} />
+      </div>
+    );
+  }
+
+  if (!activeSlot || !game) {
+    return (
+      <div className="app-shell">
+        <WorldSelect
+          userId={userId}
+          onEnter={(slot, state) => {
+            setActiveSlot(slot);
+            setGame(state);
             setTab("dashboard");
           }}
         />
@@ -107,17 +136,7 @@ export default function GameApp() {
         <MatchPreview game={game} onOpenLineup={() => setSub({ type: "lineup" })} />
       )}
       {sub === null && tab === "mercato" && <MercatoScreen game={game} setGame={updateGame} toast={toast} />}
-      {sub === null && tab === "plus" && (
-        <PlusScreen
-          game={game}
-          onNewWorld={newWorld}
-          onLoadGame={(loaded) => {
-            setGame(loaded);
-            setTab("dashboard");
-          }}
-          toast={toast}
-        />
-      )}
+      {sub === null && tab === "plus" && <PlusScreen game={game} onChangeWorld={backToWorldSelect} />}
 
       {sub?.type === "player" && (
         <PlayerScreen game={game} tireurId={sub.id} onBack={() => setSub(null)} />
@@ -244,25 +263,12 @@ function Dashboard({ game, onOpenLineup, onOpenTraining }: { game: GameState; on
   );
 }
 
-function PlusScreen({
-  game,
-  onNewWorld,
-  onLoadGame,
-  toast,
-}: {
-  game: GameState;
-  onNewWorld: () => void;
-  onLoadGame: (state: GameState) => void;
-  toast: (msg: string) => void;
-}) {
-  const [confirming, setConfirming] = useState(false);
+function PlusScreen({ game, onChangeWorld }: { game: GameState; onChangeWorld: () => void }) {
   return (
     <section className="screen">
       <span className="eyebrow-label">Bureau des Entraîneurs</span>
       <h1 className="screen-title">Plus</h1>
       <p className="screen-sub">Panthéon et profil manager arrivent avec P3 (le monde persistant multi-saisons) — cette maquette P2 se concentre sur la boucle d'une saison.</p>
-
-      <CloudPanel game={game} onLoadGame={onLoadGame} toast={toast} />
 
       <div className="panel">
         <h3>Gazette du Bassin</h3>
@@ -283,23 +289,11 @@ function PlusScreen({
       </div>
 
       <div className="panel">
-        <h3>Sauvegarde locale</h3>
+        <h3>Votre monde</h3>
         <p style={{ fontSize: ".78rem", color: "var(--text-dim)", marginBottom: 12 }}>
-          Votre monde est sauvegardé automatiquement dans ce navigateur à chaque journée.
+          Sauvegardé automatiquement en ligne sur votre compte à chaque action.
         </p>
-        {!confirming ? (
-          <button className="btn btn--ghost" onClick={() => setConfirming(true)}>Recommencer un nouveau monde</button>
-        ) : (
-          <>
-            <p style={{ fontSize: ".78rem", color: "var(--danger)", marginBottom: 12 }}>
-              Cela efface définitivement la saison en cours. Confirmer ?
-            </p>
-            <div className="sheet-actions">
-              <button className="btn btn--primary btn--sm" onClick={onNewWorld}>Oui, tout effacer</button>
-              <button className="btn btn--ghost btn--sm" onClick={() => setConfirming(false)}>Annuler</button>
-            </div>
-          </>
-        )}
+        <button className="btn btn--ghost" onClick={onChangeWorld}>Changer de monde</button>
       </div>
     </section>
   );

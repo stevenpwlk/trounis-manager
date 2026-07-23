@@ -20,6 +20,7 @@ export async function listCloudSlots(userId: string): Promise<Array<SlotSummary 
     .from(TABLE)
     .select("slot, world_name, state, updated_at")
     .eq("user_id", userId);
+  if (error) console.error("[manager_saves] listCloudSlots error:", error);
   if (error || !data) return slots;
   for (const row of data) {
     const idx = row.slot - 1;
@@ -45,6 +46,7 @@ export async function loadCloudSlot(userId: string, slot: number): Promise<GameS
     .eq("user_id", userId)
     .eq("slot", slot)
     .maybeSingle();
+  if (error) console.error("[manager_saves] loadCloudSlot error:", error);
   if (error || !data) return null;
   return data.state as GameState;
 }
@@ -62,6 +64,7 @@ export async function saveCloudSlot(userId: string, slot: number, state: GameSta
     },
     { onConflict: "user_id,slot" }
   );
+  if (error) console.error("[manager_saves] saveCloudSlot error:", error);
   return !error;
 }
 
