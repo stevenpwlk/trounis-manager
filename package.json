@@ -1,0 +1,20 @@
+{
+  "name": "trounis-manager-engine",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Moteur de simulation déterministe de Trounis Manager (P1) — sans habillage, testé en console.",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "sim:season": "tsx src/sim/report-season.ts",
+    "sim:balance": "tsx src/sim/report-balance.ts",
+    "sim:formations": "tsx src/sim/report-formations.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "tsx": "^4.19.0",
+    "vitest": "^2.1.0",
+    "@types/node": "^22.0.0"
+  }
+}
