@@ -17,6 +17,10 @@ export type Club = {
   budget: number; // Anchois d'Or de départ, cf. plan §18
   /** Biais de profil d'attributs (terroir), cf. plan §14.5. Somme informelle, pas normalisée à 1. */
   terroir: Partial<Record<AttrKey, number>>;
+  /** Objectif de direction en texte (§18) — narratif, affiché tel quel. */
+  objectiveText: string;
+  /** Rang cible dans sa ligue (1-10) dérivé de l'objectif textuel, pour l'évaluation §20. */
+  targetRank: number;
 };
 
 export type TraitId =

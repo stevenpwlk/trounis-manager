@@ -107,42 +107,87 @@ function saisineChance(ctx: TeamContext, formation: FormationId, bassin: BassinE
   return clamp(base, 0, 0.35);
 }
 
-export function simulateMatch(params: MatchParams): MatchResult {
-  const { homeRoster, awayRoster, formation, homeConsignes, awayConsignes, conditions, rng } = params;
+/**
+ * Session de match "vivante" : joue une période à la fois, et permet de
+ * changer les consignes d'une équipe entre deux périodes (mi-temps libre,
+ * temps mort borné en P3/P4 côté appelant — cette classe ne connaît pas la
+ * règle du nombre d'utilisations, c'est à l'appelant de la faire respecter,
+ * cf. §4bis/§16 : « le temps mort permet de resynchroniser les consignes »).
+ * `simulateMatch` (plus bas) est un simple enrobage qui joue les 4 périodes
+ * sans intervention — utilisé tel quel par le moteur de saison/coupe IA vs
+ * IA (P1), pour ne rien changer à son comportement/déterminisme.
+ */
+export class MatchSession {
+  private readonly formation: FormationId;
+  private readonly bassin: BassinEffect;
+  private readonly rng: Rng;
+  private home: TeamContext;
+  private away: TeamContext;
 
-  const home: TeamContext = {
-    side: "home",
-    roster: homeRoster,
-    lineup: pickLineup(homeRoster, formation),
-    consignes: homeConsignes,
-    tactics: tacticsEffect(homeConsignes),
-  };
-  const away: TeamContext = {
-    side: "away",
-    roster: awayRoster,
-    lineup: pickLineup(awayRoster, formation),
-    consignes: awayConsignes,
-    tactics: tacticsEffect(awayConsignes),
-  };
+  private momentum = 0;
+  private homeScore = 0;
+  private awayScore = 0;
+  private priorLeader: "home" | "away" | "tied" = "tied";
+  private homeSaisined = false;
+  private awaySaisined = false;
+  private maxAwayLead = 0;
+  private maxHomeLead = 0;
+  private currentPeriod = 0;
 
-  const bassin = bassinEffect(conditions);
+  readonly events: MatchEvent[] = [];
+  readonly periods: PeriodLine[] = [];
+  readonly saisines: MatchResult["saisines"] = [];
+  private readonly milestoneSet = new Set<MilestoneKind>();
 
-  const events: MatchEvent[] = [];
-  const periods: PeriodLine[] = [];
-  const saisines: MatchResult["saisines"] = [];
-  const milestones: MilestoneKind[] = [];
+  constructor(params: MatchParams) {
+    this.formation = params.formation;
+    this.rng = params.rng;
+    this.bassin = bassinEffect(params.conditions);
+    this.home = {
+      side: "home",
+      roster: params.homeRoster,
+      lineup: pickLineup(params.homeRoster, params.formation),
+      consignes: params.homeConsignes,
+      tactics: tacticsEffect(params.homeConsignes),
+    };
+    this.away = {
+      side: "away",
+      roster: params.awayRoster,
+      lineup: pickLineup(params.awayRoster, params.formation),
+      consignes: params.awayConsignes,
+      tactics: tacticsEffect(params.awayConsignes),
+    };
+  }
 
-  let momentum = 0;
-  let homeScore = 0;
-  let awayScore = 0;
-  let priorLeader: "home" | "away" | "tied" = "tied";
-  let homeSaisined = false;
-  let awaySaisined = false;
-  let maxAwayLead = 0;
-  let maxHomeLead = 0;
+  get period(): number {
+    return this.currentPeriod;
+  }
 
-  for (let period = 1; period <= PERIODS; period++) {
-    // Ciblage "cibler l'apnée adverse" : bonus si l'apnée adverse est faible (duel direct)
+  isFinished(): boolean {
+    return this.currentPeriod >= PERIODS;
+  }
+
+  getScore(): { home: number; away: number } {
+    return { home: this.homeScore, away: this.awayScore };
+  }
+
+  getMomentum(): number {
+    return this.momentum;
+  }
+
+  /** Change les consignes d'une équipe pour les périodes restantes (mi-temps/temps mort). */
+  setConsignes(side: "home" | "away", consignes: Consignes): void {
+    const ctx = side === "home" ? this.home : this.away;
+    ctx.consignes = consignes;
+    ctx.tactics = tacticsEffect(consignes);
+  }
+
+  /** Joue la période suivante ; ne fait rien si le match est déjà terminé. */
+  playNextPeriod(): void {
+    if (this.isFinished()) return;
+    const period = this.currentPeriod + 1;
+    const { home, away, bassin, formation, rng } = this;
+
     const homeTargetsWeakApnee =
       home.consignes.ciblage === "cibler-apnee" && weightedAvg(away.lineup, "apnee") < 11 ? 1.1 : 1;
     const awayTargetsWeakApnee =
@@ -153,8 +198,8 @@ export function simulateMatch(params: MatchParams): MatchResult {
     const homeDefense = teamDefense(home, formation, bassin);
     const awayDefense = teamDefense(away, formation, bassin);
 
-    const homeMomentumFactor = 1 + clamp(momentum / 100, -0.15, 0.15);
-    const awayMomentumFactor = 1 + clamp(-momentum / 100, -0.15, 0.15);
+    const homeMomentumFactor = 1 + clamp(this.momentum / 100, -0.15, 0.15);
+    const awayMomentumFactor = 1 + clamp(-this.momentum / 100, -0.15, 0.15);
 
     const homeVariance = home.tactics.varianceMult;
     const awayVariance = away.tactics.varianceMult;
@@ -165,91 +210,102 @@ export function simulateMatch(params: MatchParams): MatchResult {
     let homePts = clamp(Math.round(14 + homeEdge * 0.45 + rng.noise(4.5 * homeVariance)), 2, 30);
     let awayPts = clamp(Math.round(14 + awayEdge * 0.45 + rng.noise(4.5 * awayVariance)), 2, 30);
 
-    // Déflecteur (risque marin) : borné, ne renverse jamais un écart énorme (§14.1-e)
     if (rng.chance(bassin.deflectorChance)) {
       const side: "home" | "away" = rng.chance(0.5) ? "home" : "away";
       const reduction = rng.int(1, 3);
       if (side === "home") homePts = clamp(homePts - reduction, 2, 30);
       else awayPts = clamp(awayPts - reduction, 2, 30);
-      events.push({ period, kind: "deflector", side, homeDelta: 0, awayDelta: 0 });
+      this.events.push({ period, kind: "deflector", side, homeDelta: 0, awayDelta: 0 });
     }
 
-    // Anchois bonus (discret, +1, §16)
     if (rng.chance(anchoisBonusChance(home, bassin))) {
       homePts += 1;
-      events.push({ period, kind: "anchois", side: "home", homeDelta: 1, awayDelta: 0 });
+      this.events.push({ period, kind: "anchois", side: "home", homeDelta: 1, awayDelta: 0 });
     }
     if (rng.chance(anchoisBonusChance(away, bassin))) {
       awayPts += 1;
-      events.push({ period, kind: "anchois", side: "away", homeDelta: 0, awayDelta: 1 });
+      this.events.push({ period, kind: "anchois", side: "away", homeDelta: 0, awayDelta: 1 });
     }
 
-    // Saisines (max 1 par équipe par match, §14.6)
-    if (!homeSaisined && rng.chance(saisineChance(home, formation, bassin, away.consignes.discipline === "provoquer"))) {
+    if (!this.homeSaisined && rng.chance(saisineChance(home, formation, bassin, away.consignes.discipline === "provoquer"))) {
       const target = [...home.lineup].sort((a, b) => a.attrs.discipline - b.attrs.discipline)[0];
       if (target) {
         home.lineup = home.lineup.filter((t) => t.id !== target.id);
-        homeSaisined = true;
-        saisines.push({ side: "home", tireurId: target.id, period });
-        events.push({ period, kind: "saisine", side: "home", homeDelta: 0, awayDelta: 0, tireurId: target.id });
+        this.homeSaisined = true;
+        this.saisines.push({ side: "home", tireurId: target.id, period });
+        this.events.push({ period, kind: "saisine", side: "home", homeDelta: 0, awayDelta: 0, tireurId: target.id });
       }
     }
-    if (!awaySaisined && rng.chance(saisineChance(away, formation, bassin, home.consignes.discipline === "provoquer"))) {
+    if (!this.awaySaisined && rng.chance(saisineChance(away, formation, bassin, home.consignes.discipline === "provoquer"))) {
       const target = [...away.lineup].sort((a, b) => a.attrs.discipline - b.attrs.discipline)[0];
       if (target) {
         away.lineup = away.lineup.filter((t) => t.id !== target.id);
-        awaySaisined = true;
-        saisines.push({ side: "away", tireurId: target.id, period });
-        events.push({ period, kind: "saisine", side: "away", homeDelta: 0, awayDelta: 0, tireurId: target.id });
+        this.awaySaisined = true;
+        this.saisines.push({ side: "away", tireurId: target.id, period });
+        this.events.push({ period, kind: "saisine", side: "away", homeDelta: 0, awayDelta: 0, tireurId: target.id });
       }
     }
 
-    homeScore += homePts;
-    awayScore += awayPts;
-    periods.push({ period, home: homePts, away: awayPts });
-    events.push({ period, kind: "score", side: null, homeDelta: homePts, awayDelta: awayPts });
+    this.homeScore += homePts;
+    this.awayScore += awayPts;
+    this.periods.push({ period, home: homePts, away: awayPts });
+    this.events.push({ period, kind: "score", side: null, homeDelta: homePts, awayDelta: awayPts });
 
-    // Milestones
-    const leader: "home" | "away" | "tied" = homeScore === awayScore ? "tied" : homeScore > awayScore ? "home" : "away";
-    if (leader === "tied" && priorLeader !== "tied") {
-      milestones.push("equalizer");
-    } else if (leader !== "tied" && priorLeader !== "tied" && leader !== priorLeader) {
-      milestones.push("lead_change");
-    } else if (leader !== "tied" && priorLeader === "tied" && period > 1) {
-      milestones.push("lead_change");
+    const leader: "home" | "away" | "tied" =
+      this.homeScore === this.awayScore ? "tied" : this.homeScore > this.awayScore ? "home" : "away";
+    if (leader === "tied" && this.priorLeader !== "tied") {
+      this.milestoneSet.add("equalizer");
+    } else if (leader !== "tied" && this.priorLeader !== "tied" && leader !== this.priorLeader) {
+      this.milestoneSet.add("lead_change");
+    } else if (leader !== "tied" && this.priorLeader === "tied" && period > 1) {
+      this.milestoneSet.add("lead_change");
     }
-    priorLeader = leader;
+    this.priorLeader = leader;
 
-    maxHomeLead = Math.max(maxHomeLead, homeScore - awayScore);
-    maxAwayLead = Math.max(maxAwayLead, awayScore - homeScore);
+    this.maxHomeLead = Math.max(this.maxHomeLead, this.homeScore - this.awayScore);
+    this.maxAwayLead = Math.max(this.maxAwayLead, this.awayScore - this.homeScore);
 
-    // Momentum update
     const periodDiff = homePts - awayPts;
     const shift = clamp(periodDiff * 3, -25, 25);
-    momentum = clamp(momentum + shift, -100, 100);
+    this.momentum = clamp(this.momentum + shift, -100, 100);
+
+    this.currentPeriod = period;
+
+    if (this.currentPeriod === PERIODS) {
+      this.finalizeMilestones();
+    }
   }
 
-  // Clutch : la période 4 a un écart cumulé serré (<=6) à l'entame de la période
-  const beforeP4 = periods.slice(0, 3).reduce((acc, p) => acc + p.home - p.away, 0);
-  if (Math.abs(beforeP4) <= 6) milestones.push("clutch");
+  private finalizeMilestones(): void {
+    const beforeP4 = this.periods.slice(0, 3).reduce((acc, p) => acc + p.home - p.away, 0);
+    if (Math.abs(beforeP4) <= 6) this.milestoneSet.add("clutch");
 
-  // Comeback : une équipe menée d'au moins 10 pts à un moment donné a fini par gagner
-  if ((maxAwayLead >= 10 && homeScore > awayScore) || (maxHomeLead >= 10 && awayScore > homeScore)) {
-    milestones.push("comeback");
+    if ((this.maxAwayLead >= 10 && this.homeScore > this.awayScore) || (this.maxHomeLead >= 10 && this.awayScore > this.homeScore)) {
+      this.milestoneSet.add("comeback");
+    }
+
+    const homeWonPeriods = this.periods.filter((p) => p.home > p.away).length;
+    const awayWonPeriods = this.periods.filter((p) => p.away > p.home).length;
+    if (homeWonPeriods >= 3 || awayWonPeriods >= 3) this.milestoneSet.add("run");
   }
 
-  // Run : une équipe a dominé 3 périodes ou plus sur les 4
-  const homeWonPeriods = periods.filter((p) => p.home > p.away).length;
-  const awayWonPeriods = periods.filter((p) => p.away > p.home).length;
-  if (homeWonPeriods >= 3 || awayWonPeriods >= 3) milestones.push("run");
+  getResult(): MatchResult {
+    return {
+      homeScore: this.homeScore,
+      awayScore: this.awayScore,
+      events: this.events,
+      periods: this.periods,
+      saisines: this.saisines,
+      milestones: Array.from(this.milestoneSet),
+      finalMomentum: this.momentum,
+    };
+  }
+}
 
-  return {
-    homeScore,
-    awayScore,
-    events,
-    periods,
-    saisines,
-    milestones: Array.from(new Set(milestones)),
-    finalMomentum: momentum,
-  };
+/** Joue un match complet sans intervention — enrobage de MatchSession, utilisé
+ * tel quel par le moteur de saison/coupe IA vs IA (comportement P1 inchangé). */
+export function simulateMatch(params: MatchParams): MatchResult {
+  const session = new MatchSession(params);
+  while (!session.isFinished()) session.playNextPeriod();
+  return session.getResult();
 }
