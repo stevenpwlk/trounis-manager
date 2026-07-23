@@ -10,6 +10,7 @@ import MatchLive from "./screens/MatchLive";
 import MatchSynthesis from "./screens/MatchSynthesis";
 import MercatoScreen from "./screens/MercatoScreen";
 import SeasonEnd from "./screens/SeasonEnd";
+import CloudPanel from "./screens/CloudPanel";
 import { DashboardIcon, RosterIcon, MatchIcon, MercatoIcon, PlusIcon } from "./icons";
 import { useToast } from "./useToast";
 import { FORMATION_LABELS } from "./trait-labels";
@@ -106,7 +107,17 @@ export default function GameApp() {
         <MatchPreview game={game} onOpenLineup={() => setSub({ type: "lineup" })} />
       )}
       {sub === null && tab === "mercato" && <MercatoScreen game={game} setGame={updateGame} toast={toast} />}
-      {sub === null && tab === "plus" && <PlusScreen game={game} onNewWorld={newWorld} />}
+      {sub === null && tab === "plus" && (
+        <PlusScreen
+          game={game}
+          onNewWorld={newWorld}
+          onLoadGame={(loaded) => {
+            setGame(loaded);
+            setTab("dashboard");
+          }}
+          toast={toast}
+        />
+      )}
 
       {sub?.type === "player" && (
         <PlayerScreen game={game} tireurId={sub.id} onBack={() => setSub(null)} />
@@ -233,13 +244,25 @@ function Dashboard({ game, onOpenLineup, onOpenTraining }: { game: GameState; on
   );
 }
 
-function PlusScreen({ game, onNewWorld }: { game: GameState; onNewWorld: () => void }) {
+function PlusScreen({
+  game,
+  onNewWorld,
+  onLoadGame,
+  toast,
+}: {
+  game: GameState;
+  onNewWorld: () => void;
+  onLoadGame: (state: GameState) => void;
+  toast: (msg: string) => void;
+}) {
   const [confirming, setConfirming] = useState(false);
   return (
     <section className="screen">
       <span className="eyebrow-label">Bureau des Entraîneurs</span>
       <h1 className="screen-title">Plus</h1>
       <p className="screen-sub">Panthéon et profil manager arrivent avec P3 (le monde persistant multi-saisons) — cette maquette P2 se concentre sur la boucle d'une saison.</p>
+
+      <CloudPanel game={game} onLoadGame={onLoadGame} toast={toast} />
 
       <div className="panel">
         <h3>Gazette du Bassin</h3>
