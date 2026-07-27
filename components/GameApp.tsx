@@ -15,6 +15,8 @@ import SeasonEnd from "./screens/SeasonEnd";
 import VivierScreen from "./screens/VivierScreen";
 import { DashboardIcon, RosterIcon, MatchIcon, MercatoIcon, PlusIcon } from "./icons";
 import { useToast } from "./useToast";
+import { useTutorial } from "./tutorial/useTutorial";
+import TutorialOverlay from "./tutorial/TutorialOverlay";
 import { FORMATION_LABELS } from "./trait-labels";
 import Crest from "./Crest";
 import { getClub } from "../src/data/clubs";
@@ -42,6 +44,28 @@ export default function GameApp() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [sub, setSub] = useState<SubScreen>(null);
   const { message, toast } = useToast();
+  const tutorial = useTutorial();
+
+  // Tutoriel contextuel (§ demande Steven 2026-07-27) : chaque moment ne se déclenche
+  // qu'à la première visite de l'écran correspondant (useTutorial track le "vu" en
+  // localStorage, à l'échelle du navigateur, pas du monde — cf. useTutorial.ts).
+  useEffect(() => {
+    if (!game) return;
+    if (sub === null && tab === "dashboard" && !game.vivierPool && !game.seasonReport) {
+      tutorial.trigger("bienvenue");
+    } else if (sub?.type === "training") {
+      tutorial.trigger("entrainement");
+    } else if (sub?.type === "lineup") {
+      tutorial.trigger("composition");
+    } else if (sub?.type === "live") {
+      tutorial.trigger("match");
+    } else if (sub === null && tab === "mercato") {
+      tutorial.trigger("mercato");
+    } else if (sub?.type === "season-end" || game.vivierPool || game.seasonReport) {
+      tutorial.trigger("fin-saison");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game, tab, sub]);
 
   // Trounis Manager vit entièrement en ligne : connexion obligatoire, l'état de jeu n'existe
   // que dans manager_saves (pas de filet local — décision explicite avec Steven le 2026-07-23,
@@ -144,7 +168,7 @@ export default function GameApp() {
         <MatchPreview game={game} onOpenLineup={() => setSub({ type: "lineup" })} />
       )}
       {sub === null && tab === "mercato" && <MercatoScreen game={game} setGame={updateGame} toast={toast} />}
-      {sub === null && tab === "plus" && <PlusScreen game={game} onChangeWorld={backToWorldSelect} />}
+      {sub === null && tab === "plus" && <PlusScreen game={game} onChangeWorld={backToWorldSelect} onReplayTutorial={tutorial.replay} />}
 
       {sub?.type === "player" && (
         <PlayerScreen game={game} tireurId={sub.id} onBack={() => setSub(null)} />
@@ -210,6 +234,12 @@ export default function GameApp() {
         </nav>
       )}
       <div className={`toast ${message ? "show" : ""}`}>{message}</div>
+      <TutorialOverlay
+        activeId={tutorial.activeId}
+        formation={game.journee <= 18 ? currentFormation(game) : "triangle"}
+        onDismiss={tutorial.dismiss}
+        onSkipAll={tutorial.skipAll}
+      />
     </div>
   );
 }
@@ -273,7 +303,15 @@ function Dashboard({ game, onOpenLineup, onOpenTraining }: { game: GameState; on
   );
 }
 
-function PlusScreen({ game, onChangeWorld }: { game: GameState; onChangeWorld: () => void }) {
+function PlusScreen({
+  game,
+  onChangeWorld,
+  onReplayTutorial,
+}: {
+  game: GameState;
+  onChangeWorld: () => void;
+  onReplayTutorial: () => void;
+}) {
   return (
     <section className="screen">
       <span className="eyebrow-label">Bureau des Entraîneurs</span>
@@ -304,6 +342,14 @@ function PlusScreen({ game, onChangeWorld }: { game: GameState; onChangeWorld: (
           Sauvegardé automatiquement en ligne sur votre compte à chaque action.
         </p>
         <button className="btn btn--ghost" onClick={onChangeWorld}>Changer de monde</button>
+      </div>
+
+      <div className="panel">
+        <h3>Aide</h3>
+        <p style={{ fontSize: ".78rem", color: "var(--text-dim)", marginBottom: 12 }}>
+          Revoir les explications du Bureau sur l'entraînement, la composition, le match, le mercato et les fins de saison.
+        </p>
+        <button className="btn btn--ghost" onClick={onReplayTutorial}>Revoir le tutoriel</button>
       </div>
     </section>
   );

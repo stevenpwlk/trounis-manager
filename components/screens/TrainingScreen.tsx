@@ -125,7 +125,7 @@ export default function TrainingScreen({
 
       {!done && (
         <>
-          <button className="btn btn--primary" onClick={validate}>Valider la semaine</button>
+          <button className="btn btn--primary" data-tutorial-target="training-validate" onClick={validate}>Valider la semaine</button>
           <div className="gap-sm" />
           <button className="btn btn--ghost" onClick={delegate}>Laisser le Bureau décider</button>
         </>

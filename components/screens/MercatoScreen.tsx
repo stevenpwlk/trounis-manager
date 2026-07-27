@@ -167,7 +167,13 @@ export default function MercatoScreen({
                   <Crest code={c.clubCode} size="sm" />
                   {c.tireur.name} ({getClub(c.clubCode).name})
                 </span>
-                <button className="btn btn--ghost btn--sm" onClick={() => openOffer(c)}>Proposer</button>
+                <button
+                  className="btn btn--ghost btn--sm"
+                  data-tutorial-target={i === 0 ? "mercato-offer" : undefined}
+                  onClick={() => openOffer(c)}
+                >
+                  Proposer
+                </button>
               </div>
             ))}
           </div>

@@ -105,7 +105,12 @@ export default function LineupScreen({
         </div>
       </div>
 
-      <button className="btn btn--primary" disabled={!canLaunch} onClick={() => onLaunch(selected, { tempo, ciblage, discipline })}>
+      <button
+        className="btn btn--primary"
+        data-tutorial-target="lineup-launch"
+        disabled={!canLaunch}
+        onClick={() => onLaunch(selected, { tempo, ciblage, discipline })}
+      >
         Lancer le match →
       </button>
     </section>
