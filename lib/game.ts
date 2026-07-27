@@ -22,6 +22,7 @@ import {
   depecheForMercatoRumeur,
   type DepecheFamille,
 } from "../src/data/depeches";
+import { generateVivierPool, type Prospect } from "../src/data/vivier";
 
 /**
  * Orchestration d'UNE saison jouable en solo (P2, §34) : le joueur dirige un
@@ -79,6 +80,7 @@ export type GameState = {
   lastMatchResult: MatchResult | null;
   lastMatchOpponent: string | null;
   seasonReport: SeasonReport | null;
+  vivierPool: Prospect[] | null; // non-null pendant l'intersaison (§14.5/§23), jusqu'à validation par le joueur
 };
 
 function otherLeagueCodes(league: "L1" | "L2"): string[] {
@@ -120,6 +122,7 @@ export function createNewGame(worldName: string, clubCode: string, seed: string)
     lastMatchResult: null,
     lastMatchOpponent: null,
     seasonReport: null,
+    vivierPool: null,
   };
 }
 
@@ -523,6 +526,9 @@ export function startNextSeason(state: GameState): GameState {
     text: depecheForRetirementWarning(name, season * 7 + i),
   }));
 
+  const activeNames = new Set(Object.values(rosters).flat().map((t) => t.name));
+  const vivierPool = generateVivierPool(createRng(`${seed}-vivier`), activeNames);
+
   return {
     ...state,
     season,
@@ -541,6 +547,7 @@ export function startNextSeason(state: GameState): GameState {
     lastMatchResult: null,
     lastMatchOpponent: null,
     seasonReport: null,
+    vivierPool,
   };
 }
 

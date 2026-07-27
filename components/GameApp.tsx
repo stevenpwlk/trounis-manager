@@ -12,6 +12,7 @@ import MatchLive from "./screens/MatchLive";
 import MatchSynthesis from "./screens/MatchSynthesis";
 import MercatoScreen from "./screens/MercatoScreen";
 import SeasonEnd from "./screens/SeasonEnd";
+import VivierScreen from "./screens/VivierScreen";
 import { DashboardIcon, RosterIcon, MatchIcon, MercatoIcon, PlusIcon } from "./icons";
 import { useToast } from "./useToast";
 import { FORMATION_LABELS } from "./trait-labels";
@@ -119,7 +120,14 @@ export default function GameApp() {
   return (
     <div className="app-shell">
       {sub === null && tab === "dashboard" && (
-        game.seasonReport ? (
+        game.vivierPool ? (
+          <VivierScreen
+            game={game}
+            setGame={updateGame}
+            toast={toast}
+            onDone={() => updateGame((g) => ({ ...g, vivierPool: null }))}
+          />
+        ) : game.seasonReport ? (
           <SeasonEnd game={game} onNextSeason={() => updateGame(startNextSeason)} />
         ) : (
           <Dashboard
