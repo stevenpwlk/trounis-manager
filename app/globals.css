@@ -258,3 +258,26 @@ p.screen-sub { color: var(--text-dim); font-size: .82rem; margin: 0 0 18px; line
 .training-projection__subject { font-weight: 600; color: var(--text); }
 .training-projection__values { font-family: var(--data); }
 .training-projection__note { color: var(--warn); font-size: .66rem; }
+
+/* Animations de match — Lot 2 (§ demande Steven 2026-07-27) */
+.momentum-bar { margin: 0 0 14px; }
+.momentum-bar__track { position: relative; display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: var(--ink-3); }
+.momentum-bar__seg { height: 100%; transition: flex-basis .4s ease; }
+.momentum-bar__seg--left { background: linear-gradient(90deg, var(--gold), var(--gold-bright)); }
+.momentum-bar__seg--right { background: linear-gradient(90deg, #5b8def, #7ea2f5); }
+.momentum-bar__center { position: absolute; top: -3px; bottom: -3px; left: 50%; width: 2px; background: var(--silver-dim); transform: translateX(-1px); }
+.momentum-bar__labels { display: flex; justify-content: space-between; font-size: .62rem; color: var(--text-dim); margin-top: 5px; text-transform: uppercase; letter-spacing: .04em; }
+
+@keyframes scorebug-pulse { 0% { transform: scale(1); } 35% { transform: scale(1.045); } 100% { transform: scale(1); } }
+.scorebug--pulse { animation: scorebug-pulse .5s ease; }
+
+@keyframes match-flash-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes match-flash-out { from { opacity: 1; } to { opacity: 0; } }
+.match-flash {
+  text-align: center; font-weight: 700; font-size: .8rem; padding: 9px 12px; border-radius: 10px; margin-bottom: 12px;
+  animation: match-flash-in .3s ease, match-flash-out .35s ease 1.05s forwards;
+}
+.match-flash--anchois { background: rgba(224,192,127,.16); color: var(--gold-bright); border: 1px solid rgba(224,192,127,.5); }
+.match-flash--saisine { background: rgba(194,91,80,.16); color: #e79a92; border: 1px solid rgba(194,91,80,.5); }
+.match-flash--deflector { background: rgba(201,133,63,.16); color: #eab476; border: 1px solid rgba(201,133,63,.5); }
+.match-flash--score { background: var(--ink-3); color: var(--text-dim); border: 1px solid var(--line); }

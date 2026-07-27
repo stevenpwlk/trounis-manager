@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GameState } from "../../lib/game";
 import { currentFixture, currentFormation, currentBassin } from "../../lib/game";
 import { getClub } from "../../src/data/clubs";
@@ -13,6 +13,7 @@ import { TEMPO_INFO, CIBLAGE_INFO, DISCIPLINE_CONSIGNE_INFO } from "../glossaryC
 import TempoImpactBars from "../preview/TempoImpactBars";
 import CiblageVerdict from "../preview/CiblageVerdict";
 import DisciplineRiskGauge from "../preview/DisciplineRiskGauge";
+import MomentumBar from "../MomentumBar";
 import Crest from "../Crest";
 
 function eventLabel(ev: { kind: string; side: string | null; homeDelta: number; awayDelta: number; period: number }): string {
@@ -27,6 +28,19 @@ function eventLabel(ev: { kind: string; side: string | null; homeDelta: number; 
       return `Un requin-marteau dévie l'action (${ev.side === "home" ? "domicile" : "extérieur"} pénalisé)`;
     default:
       return ev.kind;
+  }
+}
+
+function flashLabel(kind: string): string {
+  switch (kind) {
+    case "anchois":
+      return "Anchois converti !";
+    case "saisine":
+      return "Saisine du Conseil !";
+    case "deflector":
+      return "Un requin-marteau dévie l'action !";
+    default:
+      return "Fin de période";
   }
 }
 
@@ -57,6 +71,20 @@ export default function MatchLive({
   const [tempo, setTempo] = useState<Tempo>(initialConsignes.tempo);
   const [ciblage, setCiblage] = useState<Ciblage>(initialConsignes.ciblage);
   const [discipline, setDiscipline] = useState<DisciplineConsigne>(initialConsignes.discipline);
+  const [justScored, setJustScored] = useState(false);
+  const [flash, setFlash] = useState<{ kind: string; id: number } | null>(null);
+
+  useEffect(() => {
+    if (!justScored) return;
+    const t = setTimeout(() => setJustScored(false), 550);
+    return () => clearTimeout(t);
+  }, [justScored]);
+
+  useEffect(() => {
+    if (!flash) return;
+    const t = setTimeout(() => setFlash(null), 1450);
+    return () => clearTimeout(t);
+  }, [flash]);
 
   if (!sessionRef.current) {
     const playerRoster = game.rosters[game.clubCode]!.filter((t) => lineupIds.includes(t.id));
@@ -76,8 +104,15 @@ export default function MatchLive({
 
   function next() {
     const wasAtPeriod2 = session.period === 2;
+    const eventsBefore = session.events.length;
     session.playNextPeriod();
     forceUpdate((n) => n + 1);
+
+    const newEvents = session.events.slice(eventsBefore);
+    const notable = newEvents.find((e) => e.kind === "saisine") ?? newEvents.find((e) => e.kind === "deflector") ?? newEvents.find((e) => e.kind === "anchois");
+    if (newEvents.some((e) => e.kind === "score")) setJustScored(true);
+    if (notable) setFlash({ kind: notable.kind, id: Date.now() });
+
     if (!wasAtPeriod2 && session.period === 2) {
       setShowConsignesPanel("halftime");
     }
@@ -124,7 +159,7 @@ export default function MatchLive({
         <div><span className="eyebrow">En direct</span><h2>{club.name} — {opponent.name}</h2></div>
       </div>
 
-      <div className="scorebug">
+      <div className={`scorebug ${justScored ? "scorebug--pulse" : ""}`}>
         <div className="scorebug__team"><Crest code={isHome ? club.code : opponent.code} /><span className="scorebug__name">{isHome ? club.code : opponent.code}</span></div>
         <div style={{ textAlign: "center" }}>
           <div><span className="scorebug__score">{score.home}</span>–<span className="scorebug__score">{score.away}</span></div>
@@ -132,6 +167,20 @@ export default function MatchLive({
         </div>
         <div className="scorebug__team right"><Crest code={isHome ? opponent.code : club.code} /><span className="scorebug__name">{isHome ? opponent.code : club.code}</span></div>
       </div>
+
+      {session.period > 0 && (
+        <MomentumBar
+          momentum={session.getMomentum()}
+          leftLabel={isHome ? club.code : opponent.code}
+          rightLabel={isHome ? opponent.code : club.code}
+        />
+      )}
+
+      {flash && (
+        <div key={flash.id} className={`match-flash match-flash--${flash.kind}`}>
+          {flashLabel(flash.kind)}
+        </div>
+      )}
 
       {showConsignesPanel && (
         <div className="dossier" style={{ marginBottom: 14 }}>
