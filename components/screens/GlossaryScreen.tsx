@@ -1,10 +1,11 @@
 "use client";
+import type { ReactElement } from "react";
 import { ATTR_KEYS, type AttrKey } from "../../src/data/types";
 import { ATTR_LABELS } from "../trait-labels";
 import { ATTR_INFO, ATTR_MARKET_NOTE, TEMPO_INFO, CIBLAGE_INFO, DISCIPLINE_CONSIGNE_INFO } from "../glossaryContent";
 import { CaviteIcon, ApneeIcon, AnchoisIcon, DisciplineIcon, SouffleIcon } from "../icons";
 
-const ATTR_ICON: Record<AttrKey, () => JSX.Element> = {
+const ATTR_ICON: Record<AttrKey, () => ReactElement> = {
   cavite: CaviteIcon,
   apnee: ApneeIcon,
   anchois: AnchoisIcon,
