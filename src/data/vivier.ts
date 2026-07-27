@@ -2,6 +2,7 @@ import type { Attributes, Tireur, TraitId } from "./types";
 import { ATTR_KEYS } from "./types";
 import { CLUBS } from "./clubs";
 import { ROSTER_NAMES } from "./roster-names";
+import { RESERVE_NAMES } from "./reserve-names";
 import { generateAttributes } from "./roster";
 import { pickTraitWeighted } from "./traits";
 import { tireurValue } from "../engine/mercato";
@@ -31,10 +32,13 @@ const POOL_SIZE = 24;
 const SPOTTED_COUNT = 6;
 export const SCOUT_COST = 40;
 
-const PROSPECT_NAME_POOL = Object.values(ROSTER_NAMES)
-  .flat()
-  .filter((slot) => !slot.star)
-  .map((slot) => slot.name);
+const PROSPECT_NAME_POOL = [
+  ...Object.values(ROSTER_NAMES)
+    .flat()
+    .filter((slot) => !slot.star)
+    .map((slot) => slot.name),
+  ...Object.values(RESERVE_NAMES).flat(),
+];
 
 function attrAvg(attrs: Attributes): number {
   return ATTR_KEYS.reduce((sum, k) => sum + attrs[k], 0) / ATTR_KEYS.length;
