@@ -20,7 +20,7 @@ import Crest from "./Crest";
 import { getClub } from "../src/data/clubs";
 import { getSupabaseBrowserClient } from "../lib/supabase/client";
 import { saveCloudSlot } from "../lib/supabase/saves";
-import { currentFixture, currentFormation, startNextSeason, type GameState } from "../lib/game";
+import { currentFixture, currentFormation, startNextSeason, resolveVivierClosure, type GameState } from "../lib/game";
 import type { Consignes, FormationId } from "../src/data/types";
 import type { MatchResult } from "../src/engine/match";
 
@@ -125,7 +125,7 @@ export default function GameApp() {
             game={game}
             setGame={updateGame}
             toast={toast}
-            onDone={() => updateGame((g) => ({ ...g, vivierPool: null }))}
+            onDone={() => updateGame(resolveVivierClosure)}
           />
         ) : game.seasonReport ? (
           <SeasonEnd game={game} onNextSeason={() => updateGame(startNextSeason)} />

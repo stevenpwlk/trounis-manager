@@ -46,7 +46,7 @@ export default function MercatoScreen({
 
   function submitOffer() {
     if (!offerFor) return;
-    const richClub = getClub(offerFor.clubCode).budget >= RICH_THRESHOLD;
+    const richClub = (game.budgets?.[offerFor.clubCode] ?? getClub(offerFor.clubCode).budget) >= RICH_THRESHOLD;
     const result: OfferResult = proposeBuy(offerFor.tireur, offerAmount, { richClub, rng: createRng(`${game.seed}-offer-${Date.now()}`) });
     if (result.outcome === "accepted") {
       finalizeBuy(offerFor, result.price);

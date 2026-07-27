@@ -5,13 +5,14 @@ import { generateClubRoster, generateAttributes } from "../src/data/roster";
 import { pickTraitWeighted } from "../src/data/traits";
 import { createRng } from "../src/engine/rng";
 import { generateDoubleRoundRobin, type Fixture } from "../src/engine/schedule";
-import { segmentForJournee, FORMATION_BY_SEASON, isMercatoOpen } from "../src/engine/formations";
+import { segmentForJournee, FORMATION_BY_SEASON, isMercatoOpen, isMercatoWindowStart } from "../src/engine/formations";
 import { randomConditions } from "../src/engine/bassin";
 import { simulateMatch, type MatchResult } from "../src/engine/match";
 import { createStandings, applyResult, sortedStandings, type StandingRow } from "../src/engine/standings";
 import { evaluateObjective, type ObjectivePalier } from "../src/engine/objective";
 import { applyPostMatchFatigue, applyWeeklyRecovery, applyCollectiveSession } from "../src/engine/training";
 import { simulateCup, type CupResult } from "../src/engine/cup";
+import { tireurValue } from "../src/engine/mercato";
 import type { Rng } from "../src/engine/rng";
 import {
   depecheForMilestone,
@@ -20,9 +21,12 @@ import {
   depecheForRetirementWarning,
   depecheForBureau,
   depecheForMercatoRumeur,
+  depecheForAiSwap,
+  depecheForHiddenSigning,
+  depecheForClosureSigning,
   type DepecheFamille,
 } from "../src/data/depeches";
-import { generateVivierPool, type Prospect } from "../src/data/vivier";
+import { generateVivierPool, resolveHiddenSignings, prospectSigningFee, signIntoRoster, type Prospect } from "../src/data/vivier";
 
 /**
  * Orchestration d'UNE saison jouable en solo (P2, §34) : le joueur dirige un
@@ -67,6 +71,7 @@ export type GameState = {
   clubCode: string;
   league: "L1" | "L2";
   budget: number;
+  budgets: Record<string, number>; // budget de CHAQUE club (§8/§21, étape D) — ledger simple, pas de salaires/recettes (cf. future étape J)
   journee: number; // 1..18 ; 19 = saison terminée
   rosters: Record<string, Tireur[]>;
   fixtures: Fixture[]; // calendrier complet de la ligue du joueur
@@ -92,6 +97,8 @@ export function createNewGame(worldName: string, clubCode: string, seed: string)
   const club = getClub(clubCode);
   const rosters: Record<string, Tireur[]> = {};
   for (const c of CLUBS) rosters[c.code] = generateClubRoster(c.code, rng);
+  const budgets: Record<string, number> = {};
+  for (const c of CLUBS) budgets[c.code] = c.budget;
 
   const leagueCodes = otherLeagueCodes(club.league);
   const fixtures = generateDoubleRoundRobin(leagueCodes);
@@ -102,13 +109,14 @@ export function createNewGame(worldName: string, clubCode: string, seed: string)
     L2: sortedStandings(createStandings(L2_CODES)),
   };
 
-  return {
+  const state: GameState = {
     worldName,
     seed,
     season: 1,
     clubCode,
     league: club.league,
     budget: club.budget,
+    budgets,
     journee: 1,
     rosters,
     fixtures,
@@ -124,6 +132,7 @@ export function createNewGame(worldName: string, clubCode: string, seed: string)
     seasonReport: null,
     vivierPool: null,
   };
+  return simulateAiMercatoForJournee(state);
 }
 
 export function currentFixture(state: GameState): Fixture | null {
@@ -149,7 +158,10 @@ export function simulateAiMatchesForJournee(state: GameState, journee: number): 
   const formation = FORMATION_BY_SEASON[segmentForJournee(journee)];
   const fixturesThisJournee = state.fixtures.filter((f) => f.journee === journee);
   const league = state.league === "L1" ? "L1" : "L2";
-  const standingsTable = createStandings(league === "L1" ? L1_CODES : L2_CODES);
+  // Les codes viennent de state.standings (composition RÉELLE de la saison en cours), pas des
+  // constantes statiques L1_CODES/L2_CODES — celles-ci ne reflètent que la répartition d'origine
+  // et cassent dès qu'une saison suivante a redistribué des clubs entre ligues (étape A).
+  const standingsTable = createStandings(state.standings[league].map((r) => r.code));
   // reconstruit le classement courant à partir des résultats déjà joués (y compris le futur match du joueur, ajouté séparément)
   for (const played of state.playedResults) {
     applyResult(standingsTable, played.home, played.away, played.result);
@@ -189,8 +201,8 @@ export function simulateOtherLeagueJournee(state: GameState, journee: number): G
   const rng = createRng(`${state.seed}-ai-other-${journee}`);
   const formation = FORMATION_BY_SEASON[segmentForJournee(journee)];
   const fixturesThisJournee = state.otherFixtures.filter((f) => f.journee === journee);
-  const codes = otherLeague === "L1" ? L1_CODES : L2_CODES;
-  const standingsTable = createStandings(codes);
+  // Idem simulateAiMatchesForJournee : composition réelle de la saison, pas les constantes statiques.
+  const standingsTable = createStandings(state.standings[otherLeague].map((r) => r.code));
   for (const played of state.otherPlayedResults) {
     applyResult(standingsTable, played.home, played.away, played.result);
   }
@@ -248,6 +260,74 @@ export function applyAiWeeklyTraining(state: GameState): GameState {
     rosters[c.code] = nextRoster;
   }
   return { ...state, rosters };
+}
+
+/** Auto-réparation pour les sauvegardes créées avant l'étape D (champ absent au runtime
+ * malgré le typage, puisque loadCloudSlot fait un simple cast du JSON stocké). */
+function ensureBudgets(budgets: Record<string, number> | undefined): Record<string, number> {
+  if (budgets && CLUBS.every((c) => typeof budgets[c.code] === "number")) return budgets;
+  const fresh: Record<string, number> = {};
+  for (const c of CLUBS) fresh[c.code] = budgets?.[c.code] ?? c.budget;
+  return fresh;
+}
+
+const MAX_AI_TRANSFERS_PER_WINDOW = 2;
+
+/**
+ * Mercato IA entre les 19 autres clubs (§8/§21, étape D) : aux ouvertures de fenêtre
+ * uniquement (isMercatoWindowStart), 1-2 mouvements max, jamais le club du joueur (ni
+ * comme acheteur ni comme vendeur — les offres reçues sur ses propres tireurs recoupent
+ * le système de dépêches à choix/conséquences complet, hors scope ici cf. étape F), et
+ * jamais de star (même exclusion que MercatoScreen côté joueur).
+ *
+ * Modèle d'ÉCHANGE plutôt que d'achat sec : tous les clubs démarrent (et restent, via le
+ * remplacement 1:1 des retraites) à l'exact plafond de 10 — un pur achat exigerait une
+ * place libre qui n'existe jamais. Le club acheteur cède donc un de ses propres tireurs
+ * en retour, avec une soulte en Anchois d'Or si l'écart de valeur le justifie ; les deux
+ * effectifs restent à taille constante, jamais au-delà du plafond. Ledger simple
+ * (state.budgets) : pas de salaires ni de recettes de match — la vraie économie complète
+ * reste une étape à part (future étape J).
+ */
+export function simulateAiMercatoForJournee(state: GameState): GameState {
+  if (!isMercatoWindowStart(state.journee)) return state;
+  const rng = createRng(`${state.seed}-ai-mercato-${state.journee}`);
+  const eligible = CLUBS.filter((c) => c.code !== state.clubCode);
+
+  let rosters = state.rosters;
+  let budgets = ensureBudgets(state.budgets);
+  const depeches: Depeche[] = [];
+
+  for (let i = 0; i < MAX_AI_TRANSFERS_PER_WINDOW; i++) {
+    const avgBudget = eligible.reduce((sum, c) => sum + budgets[c.code]!, 0) / eligible.length;
+    const buyerCandidates = eligible.filter((c) => budgets[c.code]! > avgBudget && rosters[c.code]!.some((t) => !t.isStar));
+    if (buyerCandidates.length === 0) break;
+    const buyer = rng.pick(buyerCandidates);
+
+    const sellerCandidates = eligible.filter((c) => c.code !== buyer.code && rosters[c.code]!.some((t) => !t.isStar));
+    if (sellerCandidates.length === 0) break;
+    const seller = rng.pick(sellerCandidates);
+
+    const target = rng.pick(rosters[seller.code]!.filter((t) => !t.isStar)); // le tireur convoité
+    const given = rng.pick(rosters[buyer.code]!.filter((t) => !t.isStar)); // cédé en retour, effectifs inchangés en taille
+    const cash = Math.max(0, tireurValue(target) - tireurValue(given));
+    if (budgets[buyer.code]! < cash) continue;
+
+    rosters = {
+      ...rosters,
+      [seller.code]: [...rosters[seller.code]!.filter((t) => t.id !== target.id), { ...given, clubCode: seller.code }],
+      [buyer.code]: [...rosters[buyer.code]!.filter((t) => t.id !== given.id), { ...target, clubCode: buyer.code }],
+    };
+    budgets = { ...budgets, [buyer.code]: budgets[buyer.code]! - cash, [seller.code]: budgets[seller.code]! + cash };
+    depeches.push({
+      id: `${state.journee}-ai-transfer-${i}`,
+      journee: state.journee,
+      family: "mercato",
+      text: depecheForAiSwap(target.name, given.name, seller.name, buyer.name, state.journee + i),
+    });
+  }
+
+  if (depeches.length === 0) return { ...state, budgets };
+  return { ...state, rosters, budgets, depeches: [...depeches, ...state.depeches].slice(0, MAX_DEPECHES) };
 }
 
 const UPSET_FORCE_GAP = 15;
@@ -311,7 +391,8 @@ export function generateDepechesForJournee(state: GameState, playerResult: Match
 /** À appeler une fois le match du joueur terminé : enregistre le résultat au classement. */
 export function recordPlayerMatch(state: GameState, home: string, away: string, result: MatchResult): GameState {
   const league = state.league;
-  const table = createStandings(league === "L1" ? L1_CODES : L2_CODES);
+  // Idem simulateAiMatchesForJournee : composition réelle de la saison, pas les constantes statiques.
+  const table = createStandings(state.standings[league].map((r) => r.code));
   const playedResults = [...state.playedResults, { journee: state.journee, home, away, result }];
   for (const played of playedResults) {
     if (played.journee <= state.journee) applyResult(table, played.home, played.away, played.result);
@@ -527,27 +608,75 @@ export function startNextSeason(state: GameState): GameState {
   }));
 
   const activeNames = new Set(Object.values(rosters).flat().map((t) => t.name));
-  const vivierPool = generateVivierPool(createRng(`${seed}-vivier`), activeNames);
+  const rawVivierPool = generateVivierPool(createRng(`${seed}-vivier`), activeNames, state.clubCode);
+  const hidden = resolveHiddenSignings(rawVivierPool, rosters, ensureBudgets(state.budgets));
+  const hiddenDepeches: Depeche[] = hidden.signings.map((s, i) => ({
+    id: `s${season}-vivier-hidden-${i}`,
+    journee: 1,
+    family: "mercato",
+    text: depecheForHiddenSigning(s.prospectName, getClub(s.clubCode).name, season * 5 + i),
+  }));
 
-  return {
+  const transitional: GameState = {
     ...state,
     season,
     seed,
     league,
     journee: 1,
-    rosters,
+    rosters: hidden.rosters,
+    budgets: hidden.budgets,
     fixtures,
     otherFixtures,
     standings,
     playedResults: [],
     otherPlayedResults: [],
-    depeches: [...retirementDepeches, ...state.depeches].slice(0, MAX_DEPECHES),
+    depeches: [...hiddenDepeches, ...retirementDepeches, ...state.depeches].slice(0, MAX_DEPECHES),
     trainingDoneThisJournee: false,
     restedTireurId: null,
     lastMatchResult: null,
     lastMatchOpponent: null,
     seasonReport: null,
-    vivierPool,
+    vivierPool: hidden.pool,
+  };
+  // Fenêtre 1 (journée 1) : l'IA fait aussi ses mouvements à la reprise de la saison.
+  return simulateAiMercatoForJournee(transitional);
+}
+
+/**
+ * Résout la concurrence IA sur les prospects repérés que le joueur n'a pas recrutés
+ * (étape D, ferme la boucle d'"urgence réelle" du §23) : à appeler quand le joueur
+ * valide l'écran du Vivier ("Continuer"), à la place d'un simple vivierPool: null.
+ */
+export function resolveVivierClosure(state: GameState): GameState {
+  const pool = state.vivierPool ?? [];
+  let rosters = state.rosters;
+  let budgets = ensureBudgets(state.budgets);
+  const depeches: Depeche[] = [];
+  let i = 0;
+
+  for (const p of pool) {
+    if (!p.interestClubCode) continue;
+    const clubCode = p.interestClubCode;
+    const fee = prospectSigningFee(p);
+    if (budgets[clubCode]! < fee) continue;
+    const signed: Tireur = { id: `${clubCode}-vivier-${p.id}`, name: p.name, clubCode, age: p.age, attrs: { ...p.attrs }, trait: p.trait, isStar: false, forme: 100 };
+    rosters = { ...rosters, [clubCode]: signIntoRoster(rosters[clubCode]!, signed) };
+    budgets = { ...budgets, [clubCode]: budgets[clubCode]! - fee };
+    depeches.push({
+      id: `vivier-closure-${state.season}-${i}`,
+      journee: state.journee,
+      family: "mercato",
+      text: depecheForClosureSigning(p.name, getClub(clubCode).name, state.journee + i),
+    });
+    i++;
+  }
+
+  return {
+    ...state,
+    rosters,
+    budgets,
+    vivierPool: null,
+    depeches: [...depeches, ...state.depeches].slice(0, MAX_DEPECHES),
   };
 }
 

@@ -62,6 +62,21 @@ const RETIREMENT_WARNING_TEMPLATES = [
   "Sans l'annoncer officiellement, {tireur} prépare le vestiaire à une page qui pourrait bientôt se tourner.",
 ];
 
+const AI_SWAP_TEMPLATES = [
+  "{tireur} rejoint {clubB} en provenance de {clubA}, où {donne} prend la direction inverse.",
+  "Échange au sommet du mercato : {clubA} et {clubB} se troquent {tireur} contre {donne}.",
+];
+
+const HIDDEN_SIGNING_TEMPLATES = [
+  "{club} a signé {tireur}, un espoir jusque-là inconnu du grand public.",
+  "Coup discret : {club} a mis la main sur {tireur} avant même que la Gazette n'en parle.",
+];
+
+const CLOSURE_SIGNING_TEMPLATES = [
+  "{club} a fini par recruter {tireur}, que vous aviez repéré sans vous décider.",
+  "La fenêtre se referme : {tireur} rejoint finalement {club}, faute d'offre de votre part.",
+];
+
 function pickTemplate(templates: string[], seed: number): string {
   return templates[seed % templates.length]!;
 }
@@ -94,4 +109,16 @@ export function depecheForBureau(club: string, seed: number): string {
 
 export function depecheForMercatoRumeur(club: string, seed: number): string {
   return fillTemplate(pickTemplate(MERCATO_RUMOR_TEMPLATES, seed), { club });
+}
+
+export function depecheForAiSwap(tireur: string, donne: string, clubA: string, clubB: string, seed: number): string {
+  return fillTemplate(pickTemplate(AI_SWAP_TEMPLATES, seed), { tireur, donne, clubA, clubB });
+}
+
+export function depecheForHiddenSigning(tireur: string, club: string, seed: number): string {
+  return fillTemplate(pickTemplate(HIDDEN_SIGNING_TEMPLATES, seed), { tireur, club });
+}
+
+export function depecheForClosureSigning(tireur: string, club: string, seed: number): string {
+  return fillTemplate(pickTemplate(CLOSURE_SIGNING_TEMPLATES, seed), { tireur, club });
 }

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { GameState } from "../../lib/game";
-import { advanceJournee, currentFixture, recordPlayerMatch, simulateAiMatchesForJournee, simulateOtherLeagueJournee, applyWeeklyConditioning, generateDepechesForJournee, applyAiWeeklyTraining } from "../../lib/game";
+import { advanceJournee, currentFixture, recordPlayerMatch, simulateAiMatchesForJournee, simulateOtherLeagueJournee, applyWeeklyConditioning, generateDepechesForJournee, applyAiWeeklyTraining, simulateAiMercatoForJournee } from "../../lib/game";
 import { getClub } from "../../src/data/clubs";
 import type { MatchResult } from "../../src/engine/match";
 import Crest from "../Crest";
@@ -49,6 +49,7 @@ export default function MatchSynthesis({
       const newDepeches = generateDepechesForJournee(next, result, opponent);
       next = { ...next, depeches: [...newDepeches, ...next.depeches].slice(0, 40) };
       next = advanceJournee(next);
+      next = simulateAiMercatoForJournee(next); // no-op sauf à l'ouverture de la fenêtre 2 (J14)
       return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

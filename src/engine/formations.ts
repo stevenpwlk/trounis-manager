@@ -72,3 +72,8 @@ export function nextMercatoWindowStart(journee: number): number | null {
   const next = MERCATO_WINDOWS.map(([start]) => start).find((start) => start > journee);
   return next ?? null;
 }
+
+/** Vrai uniquement au premier jour d'une fenêtre — moment où l'IA fait ses mouvements de mercato (étape D). */
+export function isMercatoWindowStart(journee: number): boolean {
+  return MERCATO_WINDOWS.some(([start]) => start === journee);
+}
