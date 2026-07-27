@@ -159,58 +159,58 @@ export default function MatchLive({
         <div><span className="eyebrow">En direct</span><h2>{club.name} — {opponent.name}</h2></div>
       </div>
 
-      <div className={`scorebug ${justScored ? "scorebug--pulse" : ""}`}>
-        <div className="scorebug__team"><Crest code={isHome ? club.code : opponent.code} /><span className="scorebug__name">{isHome ? club.code : opponent.code}</span></div>
-        <div style={{ textAlign: "center" }}>
-          <div><span className="scorebug__score">{score.home}</span>–<span className="scorebug__score">{score.away}</span></div>
-          <span className="scorebug__period">{session.isFinished() ? "Terminé" : session.period === 0 ? "Avant-match" : `Période ${session.period}`}</span>
-        </div>
-        <div className="scorebug__team right"><Crest code={isHome ? opponent.code : club.code} /><span className="scorebug__name">{isHome ? opponent.code : club.code}</span></div>
-      </div>
-
-      {session.period > 0 && (
-        <MomentumBar
-          momentum={session.getMomentum()}
-          leftLabel={isHome ? club.code : opponent.code}
-          rightLabel={isHome ? opponent.code : club.code}
-        />
-      )}
-
-      {flash && (
-        <div key={flash.id} className={`match-flash match-flash--${flash.kind}`}>
-          {flashLabel(flash.kind)}
-        </div>
-      )}
-
-      {showConsignesPanel && (
-        <div className="dossier" style={{ marginBottom: 14 }}>
-          <div className="dossier__ref">{showConsignesPanel === "halftime" ? "MI-TEMPS" : "TEMPS MORT"}</div>
-          <h3>Ajuster les consignes ?</h3>
-          <div className="segmented" style={{ marginBottom: 4 }}>
-            <button className={tempo === "prudent" ? "active" : ""} onClick={() => setTempo("prudent")}>Prudent</button>
-            <button className={tempo === "equilibre" ? "active" : ""} onClick={() => setTempo("equilibre")}>Équilibré</button>
-            <button className={tempo === "offensif" ? "active" : ""} onClick={() => setTempo("offensif")}>Offensif</button>
+      <div className="live-scroll">
+        <div className={`scorebug ${justScored ? "scorebug--pulse" : ""}`}>
+          <div className="scorebug__team"><Crest code={isHome ? club.code : opponent.code} /><span className="scorebug__name">{isHome ? club.code : opponent.code}</span></div>
+          <div style={{ textAlign: "center" }}>
+            <div><span className="scorebug__score">{score.home}</span>–<span className="scorebug__score">{score.away}</span></div>
+            <span className="scorebug__period">{session.isFinished() ? "Terminé" : session.period === 0 ? "Avant-match" : `Période ${session.period}`}</span>
           </div>
-          <p style={{ fontSize: ".7rem", color: "var(--text-dim)", margin: "0 0 4px" }}>{TEMPO_INFO[tempo].effect}</p>
-          <TempoImpactBars baseline={tempoBaseline} current={tempoCurrent} />
-          <div className="segmented" style={{ marginBottom: 4 }}>
-            <button className={ciblage === "cibler-apnee" ? "active" : ""} onClick={() => setCiblage("cibler-apnee")}>Cibler l'apnée</button>
-            <button className={ciblage === "tenir-cavite" ? "active" : ""} onClick={() => setCiblage("tenir-cavite")}>Tenir la cavité</button>
-          </div>
-          <p style={{ fontSize: ".7rem", color: "var(--text-dim)", margin: "0 0 4px" }}>{CIBLAGE_INFO[ciblage].effect}</p>
-          <CiblageVerdict opponentApnee={ciblagePreview.opponentApnee} willTrigger={ciblagePreview.willTrigger} />
-          <div className="segmented" style={{ marginBottom: 4 }}>
-            <button className={discipline === "provoquer" ? "active" : ""} onClick={() => setDiscipline("provoquer")}>Provoquer</button>
-            <button className={discipline === "jouer-propre" ? "active" : ""} onClick={() => setDiscipline("jouer-propre")}>Jouer propre</button>
-          </div>
-          <p style={{ fontSize: ".7rem", color: "var(--text-dim)", margin: "0 0 4px" }}>{DISCIPLINE_CONSIGNE_INFO[discipline].effect}</p>
-          <DisciplineRiskGauge ownRisk={saisinePreview.ownRisk} opponentRisk={saisinePreview.opponentRisk} />
-          <div className="gap-sm" />
-          <button className="btn btn--primary btn--sm" onClick={applyConsignesChange}>Confirmer et continuer</button>
+          <div className="scorebug__team right"><Crest code={isHome ? opponent.code : club.code} /><span className="scorebug__name">{isHome ? opponent.code : club.code}</span></div>
         </div>
-      )}
 
-      <div className="feed-scroll">
+        {session.period > 0 && (
+          <MomentumBar
+            momentum={session.getMomentum()}
+            leftLabel={isHome ? club.code : opponent.code}
+            rightLabel={isHome ? opponent.code : club.code}
+          />
+        )}
+
+        {flash && (
+          <div key={flash.id} className={`match-flash match-flash--${flash.kind}`}>
+            {flashLabel(flash.kind)}
+          </div>
+        )}
+
+        {showConsignesPanel && (
+          <div className="dossier" style={{ marginBottom: 14 }}>
+            <div className="dossier__ref">{showConsignesPanel === "halftime" ? "MI-TEMPS" : "TEMPS MORT"}</div>
+            <h3>Ajuster les consignes ?</h3>
+            <div className="segmented" style={{ marginBottom: 4 }}>
+              <button className={tempo === "prudent" ? "active" : ""} onClick={() => setTempo("prudent")}>Prudent</button>
+              <button className={tempo === "equilibre" ? "active" : ""} onClick={() => setTempo("equilibre")}>Équilibré</button>
+              <button className={tempo === "offensif" ? "active" : ""} onClick={() => setTempo("offensif")}>Offensif</button>
+            </div>
+            <p style={{ fontSize: ".7rem", color: "var(--text-dim)", margin: "0 0 4px" }}>{TEMPO_INFO[tempo].effect}</p>
+            <TempoImpactBars baseline={tempoBaseline} current={tempoCurrent} />
+            <div className="segmented" style={{ marginBottom: 4 }}>
+              <button className={ciblage === "cibler-apnee" ? "active" : ""} onClick={() => setCiblage("cibler-apnee")}>Cibler l'apnée</button>
+              <button className={ciblage === "tenir-cavite" ? "active" : ""} onClick={() => setCiblage("tenir-cavite")}>Tenir la cavité</button>
+            </div>
+            <p style={{ fontSize: ".7rem", color: "var(--text-dim)", margin: "0 0 4px" }}>{CIBLAGE_INFO[ciblage].effect}</p>
+            <CiblageVerdict opponentApnee={ciblagePreview.opponentApnee} willTrigger={ciblagePreview.willTrigger} />
+            <div className="segmented" style={{ marginBottom: 4 }}>
+              <button className={discipline === "provoquer" ? "active" : ""} onClick={() => setDiscipline("provoquer")}>Provoquer</button>
+              <button className={discipline === "jouer-propre" ? "active" : ""} onClick={() => setDiscipline("jouer-propre")}>Jouer propre</button>
+            </div>
+            <p style={{ fontSize: ".7rem", color: "var(--text-dim)", margin: "0 0 4px" }}>{DISCIPLINE_CONSIGNE_INFO[discipline].effect}</p>
+            <DisciplineRiskGauge ownRisk={saisinePreview.ownRisk} opponentRisk={saisinePreview.opponentRisk} />
+            <div className="gap-sm" />
+            <button className="btn btn--primary btn--sm" onClick={applyConsignesChange}>Confirmer et continuer</button>
+          </div>
+        )}
+
         <div className="feed">
           {session.events.map((ev, i) => (
             <div key={i} className={`feed-ev ${ev.kind === "saisine" || ev.kind === "deflector" ? "milestone" : ev.side ?? ""}`}>

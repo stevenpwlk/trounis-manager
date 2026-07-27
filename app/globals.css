@@ -170,7 +170,7 @@ p.screen-sub { color: var(--text-dim); font-size: .82rem; margin: 0 0 18px; line
 .standings-row--self { background: rgba(201,164,92,.14); border: 1px solid rgba(201,164,92,.4); }
 .standings-row__rank { font-family: var(--data); font-size: .68rem; color: var(--text-dim); width: 16px; display: inline-block; text-align: right; }
 
-.feed-scroll { flex: 1; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
+.live-scroll { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
 .feed { display: flex; flex-direction: column; gap: 9px; margin-bottom: 14px; }
 .feed-ev { background: var(--ink-2); border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: 9px; padding: 9px 11px; font-size: .78rem; line-height: 1.4; }
 .feed-ev.home { border-left-color: var(--gold); }
