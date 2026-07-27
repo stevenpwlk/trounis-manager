@@ -4,6 +4,24 @@ Jeu 2 de l'écosystème Trounis — un manager de tir de précision aquatique
 (la « Cavité »), conçu dans `~/.claude/plans/trounis-manager-conception-managerial-anchovy.md`.
 **En ligne sur [manager.trounis.fr](https://manager.trounis.fr).**
 
+La première édition jouable est volontairement centrée sur le Trounis
+Aquatique. Une campagne Trounis de Terre est prévue comme extension officielle
+ultérieure. Ce choix de périmètre produit ne crée aucune hiérarchie dans le
+lore : les deux disciplines possèdent le même rang au sein de la F.I.S.T. et
+la Réforme Connétable du 1er juin 2026 s'applique aux deux.
+
+### Roster canonique de Makitouffe
+
+La même génération active réunit Marine « La Vague », Tanaka « Le
+Tourbillon », Alex « Le Nageur Mystérieux », Nakamura « L'Eau calme », Maki
+Yage et Hana Conda. Les quatre premiers sont déjà établis dans le lore public ;
+les deux derniers proviennent de Trounis Manager.
+
+Le fichier `src/data/stars.ts` ne contient actuellement que Maki Yage et Hana
+Conda. L'intégration des quatre autres au roster fixe constitue une dette de
+contenu à traiter dans un futur jalon, après définition de leurs âges,
+attributs et traits sans contradiction avec le lore.
+
 Trounis Manager vit entièrement en ligne : connexion obligatoire avec un
 compte Trounis existant (même écosystème que les pronos et Cavity Game),
 3 emplacements de sauvegarde synchronisés en base — aucun état de partie ne
