@@ -1,11 +1,14 @@
 "use client";
 import { useState } from "react";
 import type { GameState } from "../../lib/game";
+import { currentFormation } from "../../lib/game";
 import type { AttrKey } from "../../src/data/types";
 import { ATTR_KEYS } from "../../src/data/types";
 import { ATTR_LABELS } from "../trait-labels";
-import { applyCollectiveSession, applySpecificWork } from "../../src/engine/training";
+import { applyCollectiveSession, applySpecificWork, collectiveGain, specificGain } from "../../src/engine/training";
 import { ATTR_INFO } from "../glossaryContent";
+import FormationPriorityBars from "../preview/FormationPriorityBars";
+import TrainingProjection from "../preview/TrainingProjection";
 import { formeLabel } from "./RosterScreen";
 
 const ATTR_SHORT: Record<AttrKey, string> = { cavite: "Cavité", apnee: "Apnée", anchois: "Anchois", discipline: "Discip.", souffle: "Souffle" };
@@ -22,12 +25,17 @@ export default function TrainingScreen({
   toast: (msg: string) => void;
 }) {
   const roster = game.rosters[game.clubCode]!;
+  const formation = currentFormation(game);
   const [collectiveAttr, setCollectiveAttr] = useState<AttrKey>("cavite");
   const [specificId, setSpecificId] = useState(roster[0]!.id);
   const [specificAttr, setSpecificAttr] = useState<AttrKey>("cavite");
   const [restedId, setRestedId] = useState<string>(() => [...roster].sort((a, b) => a.forme - b.forme)[0]!.id);
 
   const done = game.trainingDoneThisJournee;
+  const collectiveAvgCurrent = roster.reduce((s, t) => s + t.attrs[collectiveAttr], 0) / roster.length;
+  const collectiveAvgProjected =
+    roster.reduce((s, t) => s + t.attrs[collectiveAttr] + collectiveGain(t, collectiveAttr, roster), 0) / roster.length;
+  const specificTarget = roster.find((t) => t.id === specificId);
 
   function validate() {
     setGame((g) => {
@@ -82,6 +90,10 @@ export default function TrainingScreen({
       )}
 
       <div className="panel">
+        <FormationPriorityBars formation={formation} />
+      </div>
+
+      <div className="panel">
         <h3>① Séance collective</h3>
         <p style={{ fontSize: ".74rem", color: "var(--text-dim)", margin: "0 0 10px" }}>Tout l'effectif gagne de l'XP dans l'attribut choisi.</p>
         <div className="segmented">
@@ -94,6 +106,12 @@ export default function TrainingScreen({
         <p style={{ fontSize: ".72rem", color: "var(--text-dim)", margin: "8px 0 0" }}>
           {ATTR_INFO[collectiveAttr].roleTag} — {ATTR_INFO[collectiveAttr].summary}
         </p>
+        <TrainingProjection
+          attr={collectiveAttr}
+          current={collectiveAvgCurrent}
+          projected={collectiveAvgProjected}
+          subject="Effectif complet (moyenne)"
+        />
       </div>
 
       <div className="panel">
@@ -119,6 +137,14 @@ export default function TrainingScreen({
         <p style={{ fontSize: ".72rem", color: "var(--text-dim)", margin: "8px 0 0" }}>
           {ATTR_INFO[specificAttr].roleTag} — {ATTR_INFO[specificAttr].summary}
         </p>
+        {specificTarget && (
+          <TrainingProjection
+            attr={specificAttr}
+            current={specificTarget.attrs[specificAttr]}
+            projected={specificTarget.attrs[specificAttr] + specificGain(specificTarget, specificAttr)}
+            subject={specificTarget.name}
+          />
+        )}
       </div>
 
       <div className="panel">

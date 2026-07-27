@@ -5,10 +5,15 @@ import { currentFixture, currentFormation, currentBassin } from "../../lib/game"
 import { getClub } from "../../src/data/clubs";
 import { SLOTS_BY_FORMATION } from "../../src/engine/formations";
 import { pickLineup } from "../../src/engine/match";
+import { previewTempoImpact, previewCiblage, previewSaisineRisk } from "../../src/engine/preview";
+import type { MatchTraitContext } from "../../src/engine/traits-effects";
 import { DEFAULT_CONSIGNES } from "../../src/data/types";
 import type { Consignes, Tempo, Ciblage, DisciplineConsigne } from "../../src/data/types";
 import { FORMATION_LABELS, BASSIN_LABELS } from "../trait-labels";
 import { TEMPO_INFO, CIBLAGE_INFO, DISCIPLINE_CONSIGNE_INFO } from "../glossaryContent";
+import TempoImpactBars from "../preview/TempoImpactBars";
+import CiblageVerdict from "../preview/CiblageVerdict";
+import DisciplineRiskGauge from "../preview/DisciplineRiskGauge";
 
 export default function LineupScreen({
   game,
@@ -41,6 +46,16 @@ export default function LineupScreen({
   }
 
   const canLaunch = selected.length === slots;
+
+  const currentLineup = roster.filter((t) => selected.includes(t.id));
+  const opponentRoster = opponentCode ? game.rosters[opponentCode]! : [];
+  const opponentLineup = opponentCode ? pickLineup(opponentRoster, formation) : [];
+  const traitCtx: MatchTraitContext = { formation, period: 1, isCrunch: false };
+  const currentConsignes: Consignes = { tempo, ciblage, discipline };
+  const tempoBaseline = previewTempoImpact(currentLineup, { ...currentConsignes, tempo: "equilibre" }, bassin, traitCtx);
+  const tempoCurrent = previewTempoImpact(currentLineup, currentConsignes, bassin, traitCtx);
+  const ciblagePreview = previewCiblage(opponentLineup);
+  const saisinePreview = previewSaisineRisk(currentLineup, opponentLineup, currentConsignes, bassin, traitCtx);
 
   return (
     <section className="screen">
@@ -91,6 +106,7 @@ export default function LineupScreen({
           <button className={tempo === "offensif" ? "active" : ""} onClick={() => setTempo("offensif")}>Offensif</button>
         </div>
         <p style={{ fontSize: ".72rem", color: "var(--text-dim)", margin: "8px 0 0" }}>{TEMPO_INFO[tempo].effect}</p>
+        <TempoImpactBars baseline={tempoBaseline} current={tempoCurrent} />
       </div>
       <div className="panel">
         <h3>Ciblage</h3>
@@ -99,6 +115,7 @@ export default function LineupScreen({
           <button className={ciblage === "tenir-cavite" ? "active" : ""} onClick={() => setCiblage("tenir-cavite")}>Tenir la cavité</button>
         </div>
         <p style={{ fontSize: ".72rem", color: "var(--text-dim)", margin: "8px 0 0" }}>{CIBLAGE_INFO[ciblage].effect}</p>
+        {opponentCode && <CiblageVerdict opponentApnee={ciblagePreview.opponentApnee} willTrigger={ciblagePreview.willTrigger} />}
       </div>
       <div className="panel">
         <h3>Discipline de jeu</h3>
@@ -107,6 +124,7 @@ export default function LineupScreen({
           <button className={discipline === "jouer-propre" ? "active" : ""} onClick={() => setDiscipline("jouer-propre")}>Jouer propre</button>
         </div>
         <p style={{ fontSize: ".72rem", color: "var(--text-dim)", margin: "8px 0 0" }}>{DISCIPLINE_CONSIGNE_INFO[discipline].effect}</p>
+        {opponentCode && <DisciplineRiskGauge ownRisk={saisinePreview.ownRisk} opponentRisk={saisinePreview.opponentRisk} />}
       </div>
 
       <button

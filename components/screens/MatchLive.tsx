@@ -4,10 +4,15 @@ import type { GameState } from "../../lib/game";
 import { currentFixture, currentFormation, currentBassin } from "../../lib/game";
 import { getClub } from "../../src/data/clubs";
 import { MatchSession, type MatchResult } from "../../src/engine/match";
+import { previewTempoImpact, previewCiblage, previewSaisineRisk } from "../../src/engine/preview";
+import type { MatchTraitContext } from "../../src/engine/traits-effects";
 import { createRng } from "../../src/engine/rng";
 import { DEFAULT_CONSIGNES } from "../../src/data/types";
 import type { Consignes, Tempo, Ciblage, DisciplineConsigne } from "../../src/data/types";
 import { TEMPO_INFO, CIBLAGE_INFO, DISCIPLINE_CONSIGNE_INFO } from "../glossaryContent";
+import TempoImpactBars from "../preview/TempoImpactBars";
+import CiblageVerdict from "../preview/CiblageVerdict";
+import DisciplineRiskGauge from "../preview/DisciplineRiskGauge";
 import Crest from "../Crest";
 
 function eventLabel(ev: { kind: string; side: string | null; homeDelta: number; awayDelta: number; period: number }): string {
@@ -97,6 +102,21 @@ export default function MatchLive({
   const score = session.getScore();
   const canTimeout = !timeoutUsed && session.period >= 2 && session.period <= 3 && !session.isFinished();
 
+  const ownLineup = session.getLineup(isHome ? "home" : "away");
+  const opponentLineup = session.getLineup(isHome ? "away" : "home");
+  const previewPeriod = Math.min(session.period + 1, 4);
+  const previewCtx: MatchTraitContext = {
+    formation,
+    period: previewPeriod,
+    isCrunch: previewPeriod === 4 && Math.abs(score.home - score.away) <= 6,
+  };
+  const previewConsignes: Consignes = { tempo, ciblage, discipline };
+  const bassin = currentBassin(game);
+  const tempoBaseline = previewTempoImpact(ownLineup, { ...previewConsignes, tempo: "equilibre" }, bassin, previewCtx);
+  const tempoCurrent = previewTempoImpact(ownLineup, previewConsignes, bassin, previewCtx);
+  const ciblagePreview = previewCiblage(opponentLineup);
+  const saisinePreview = previewSaisineRisk(ownLineup, opponentLineup, previewConsignes, bassin, previewCtx);
+
   return (
     <section className="screen screen--live">
       <div className="subheader">
@@ -122,17 +142,21 @@ export default function MatchLive({
             <button className={tempo === "equilibre" ? "active" : ""} onClick={() => setTempo("equilibre")}>Équilibré</button>
             <button className={tempo === "offensif" ? "active" : ""} onClick={() => setTempo("offensif")}>Offensif</button>
           </div>
-          <p style={{ fontSize: ".7rem", color: "var(--text-dim)", margin: "0 0 8px" }}>{TEMPO_INFO[tempo].effect}</p>
+          <p style={{ fontSize: ".7rem", color: "var(--text-dim)", margin: "0 0 4px" }}>{TEMPO_INFO[tempo].effect}</p>
+          <TempoImpactBars baseline={tempoBaseline} current={tempoCurrent} />
           <div className="segmented" style={{ marginBottom: 4 }}>
             <button className={ciblage === "cibler-apnee" ? "active" : ""} onClick={() => setCiblage("cibler-apnee")}>Cibler l'apnée</button>
             <button className={ciblage === "tenir-cavite" ? "active" : ""} onClick={() => setCiblage("tenir-cavite")}>Tenir la cavité</button>
           </div>
-          <p style={{ fontSize: ".7rem", color: "var(--text-dim)", margin: "0 0 8px" }}>{CIBLAGE_INFO[ciblage].effect}</p>
+          <p style={{ fontSize: ".7rem", color: "var(--text-dim)", margin: "0 0 4px" }}>{CIBLAGE_INFO[ciblage].effect}</p>
+          <CiblageVerdict opponentApnee={ciblagePreview.opponentApnee} willTrigger={ciblagePreview.willTrigger} />
           <div className="segmented" style={{ marginBottom: 4 }}>
             <button className={discipline === "provoquer" ? "active" : ""} onClick={() => setDiscipline("provoquer")}>Provoquer</button>
             <button className={discipline === "jouer-propre" ? "active" : ""} onClick={() => setDiscipline("jouer-propre")}>Jouer propre</button>
           </div>
-          <p style={{ fontSize: ".7rem", color: "var(--text-dim)", margin: "0 0 12px" }}>{DISCIPLINE_CONSIGNE_INFO[discipline].effect}</p>
+          <p style={{ fontSize: ".7rem", color: "var(--text-dim)", margin: "0 0 4px" }}>{DISCIPLINE_CONSIGNE_INFO[discipline].effect}</p>
+          <DisciplineRiskGauge ownRisk={saisinePreview.ownRisk} opponentRisk={saisinePreview.opponentRisk} />
+          <div className="gap-sm" />
           <button className="btn btn--primary btn--sm" onClick={applyConsignesChange}>Confirmer et continuer</button>
         </div>
       )}

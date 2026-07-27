@@ -10,15 +10,17 @@ import { trainingGainMultiplier, ombreDuVestiaireBonus, fatigueResistanceFactor 
  * plus, cf. §7).
  */
 
-function ageProgressionFactor(age: number): number {
+export function ageProgressionFactor(age: number): number {
   if (age <= 27) return 1;
   if (age >= 33) return 0.1;
   return 1 - ((age - 27) / 6) * 0.9;
 }
 
-function diminishingFactor(currentValue: number): number {
+export function diminishingFactor(currentValue: number): number {
   return currentValue >= 15 ? 0.3 : 1;
 }
+
+export const DIMINISHING_RETURNS_THRESHOLD = 15;
 
 const COLLECTIVE_BASE_GAIN = 0.35;
 const SPECIFIC_BASE_GAIN = 1.3;
@@ -35,24 +37,34 @@ function clampForme(value: number): number {
   return Math.max(0, Math.min(100, value));
 }
 
+/** Gain d'une séance collective pour UN tireur — extrait pour être réutilisable telle
+ * quelle par l'aperçu de projection à l'écran (§ demande Steven 2026-07-27), sans dupliquer
+ * la formule en version approximative côté UI. */
+export function collectiveGain(t: Tireur, attr: AttrKey, roster: Tireur[]): number {
+  return (
+    COLLECTIVE_BASE_GAIN *
+    ageProgressionFactor(t.age) *
+    diminishingFactor(t.attrs[attr]) *
+    trainingGainMultiplier(t) *
+    ombreDuVestiaireBonus(roster, t)
+  );
+}
+
+/** Gain d'un travail spécifique pour UN tireur — même raison d'être que collectiveGain(). */
+export function specificGain(tireur: Tireur, attr: AttrKey): number {
+  return SPECIFIC_BASE_GAIN * ageProgressionFactor(tireur.age) * diminishingFactor(tireur.attrs[attr]) * trainingGainMultiplier(tireur);
+}
+
 /** Geste 1 : séance collective — tout l'effectif progresse un peu sur un attribut. */
 export function applyCollectiveSession(roster: Tireur[], attr: AttrKey): void {
   for (const t of roster) {
-    const gain =
-      COLLECTIVE_BASE_GAIN *
-      ageProgressionFactor(t.age) *
-      diminishingFactor(t.attrs[attr]) *
-      trainingGainMultiplier(t) *
-      ombreDuVestiaireBonus(roster, t);
-    t.attrs[attr] = clampAttr(t.attrs[attr] + gain);
+    t.attrs[attr] = clampAttr(t.attrs[attr] + collectiveGain(t, attr, roster));
   }
 }
 
 /** Geste 2 : travail spécifique — un tireur ciblé progresse fortement sur un attribut. */
 export function applySpecificWork(tireur: Tireur, attr: AttrKey): void {
-  const gain =
-    SPECIFIC_BASE_GAIN * ageProgressionFactor(tireur.age) * diminishingFactor(tireur.attrs[attr]) * trainingGainMultiplier(tireur);
-  tireur.attrs[attr] = clampAttr(tireur.attrs[attr] + gain);
+  tireur.attrs[attr] = clampAttr(tireur.attrs[attr] + specificGain(tireur, attr));
 }
 
 /**

@@ -229,3 +229,32 @@ p.screen-sub { color: var(--text-dim); font-size: .82rem; margin: 0 0 18px; line
 
 .glossary-icon { width: 26px; height: 26px; flex: none; color: var(--gold-bright); }
 .glossary-icon svg { width: 100%; height: 100%; }
+
+/* Visuels dynamiques par consigne (§ Lot 1, demande Steven 2026-07-27) — pilote coloré,
+   une couleur par attribut, cantonné à ces composants sans toucher le reste du design. */
+.impact-bars { display: flex; flex-direction: column; gap: 10px; margin: 10px 0 2px; }
+.impact-bar__head { display: flex; justify-content: space-between; font-size: .72rem; font-weight: 700; margin-bottom: 4px; }
+.impact-bar__value { font-family: var(--data); font-variant-numeric: tabular-nums; color: var(--text); }
+.impact-bar__track { position: relative; height: 8px; border-radius: 999px; background: var(--ink-3); }
+.impact-bar__fill { position: absolute; top: 0; left: 0; height: 100%; border-radius: 999px; transition: width .25s ease; }
+.impact-bar__baseline { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--silver-dim); transition: left .25s ease; }
+
+.ciblage-verdict { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: .78rem; margin: 10px 0 2px; }
+
+.risk-gauge { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 2px; }
+.risk-row__head { display: flex; justify-content: space-between; font-size: .72rem; margin-bottom: 3px; }
+.risk-row__track { height: 7px; border-radius: 999px; background: var(--ink-3); overflow: hidden; }
+.risk-row__fill { height: 100%; border-radius: 999px; transition: width .25s ease; }
+
+.priority-bars { margin-bottom: 4px; }
+.priority-bars__caption { font-size: .72rem; color: var(--text-dim); margin: 0 0 8px; }
+.priority-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.priority-bar__label { flex: 0 0 62px; font-size: .68rem; font-weight: 700; }
+.priority-bar__track { flex: 1; height: 7px; border-radius: 999px; background: var(--ink-3); overflow: hidden; }
+.priority-bar__fill { height: 100%; border-radius: 999px; transition: width .25s ease; }
+.priority-bar__val { flex: 0 0 34px; font-family: var(--data); font-size: .64rem; color: var(--text-dim); text-align: right; }
+
+.training-projection { font-size: .72rem; color: var(--text-dim); margin: 8px 0 0; display: flex; flex-direction: column; gap: 2px; }
+.training-projection__subject { font-weight: 600; color: var(--text); }
+.training-projection__values { font-family: var(--data); }
+.training-projection__note { color: var(--warn); font-size: .66rem; }

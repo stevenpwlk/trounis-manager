@@ -41,6 +41,10 @@ export type MatchParams = {
 
 const PERIODS = 4;
 
+/** Seuil d'apnée adverse en-dessous duquel "Cibler l'apnée" s'active (§16) — constante
+ * partagée avec src/engine/preview.ts pour que l'aperçu ne se désynchronise jamais du réel. */
+export const CIBLAGE_APNEE_THRESHOLD = 11;
+
 /** Sélectionne les N meilleurs tireurs disponibles pour la formation (IA de base, §21). */
 export function pickLineup(roster: Tireur[], formation: FormationId): Tireur[] {
   const n = SLOTS_BY_FORMATION[formation];
@@ -60,7 +64,7 @@ export function pickLineup(roster: Tireur[], formation: FormationId): Tireur[] {
   return scored.slice(0, n).map((s) => s.t);
 }
 
-function weightedAvg(lineup: Tireur[], key: AttrKey, ctx?: MatchTraitContext): number {
+export function weightedAvg(lineup: Tireur[], key: AttrKey, ctx?: MatchTraitContext): number {
   if (lineup.length === 0) return 0;
   if (!ctx) return lineup.reduce((sum, t) => sum + t.attrs[key], 0) / lineup.length;
   return lineup.reduce((sum, t) => sum + traitAttrValue(t, key, ctx), 0) / lineup.length;
@@ -70,7 +74,7 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-type TeamContext = {
+export type TeamContext = {
   side: "home" | "away";
   roster: Tireur[];
   lineup: Tireur[];
@@ -100,7 +104,7 @@ function anchoisBonusChance(ctx: TeamContext, bassin: BassinEffect, traitCtx: Ma
   return clamp((anchois - 8) / 40, 0.02, 0.35);
 }
 
-function saisineChance(ctx: TeamContext, formation: FormationId, bassin: BassinEffect, isOpponentProvoking: boolean, traitCtx: MatchTraitContext): number {
+export function saisineChance(ctx: TeamContext, formation: FormationId, bassin: BassinEffect, isOpponentProvoking: boolean, traitCtx: MatchTraitContext): number {
   const w = FORMATION_WEIGHTS[formation];
   const discipline = weightedAvg(ctx.lineup, "discipline", traitCtx) * bassin.disciplineMult;
   let base = clamp((14 - discipline) / 100, 0, 0.12) * w.discipline;
@@ -178,6 +182,12 @@ export class MatchSession {
     return this.momentum;
   }
 
+  /** Composition actuelle d'un camp (reflète une éventuelle saisine déjà survenue) — pour les
+   * aperçus de mi-temps/temps mort (§ demande Steven 2026-07-27), jamais mutée depuis l'extérieur. */
+  getLineup(side: "home" | "away"): Tireur[] {
+    return side === "home" ? this.home.lineup : this.away.lineup;
+  }
+
   /** Change les consignes d'une équipe pour les périodes restantes (mi-temps/temps mort). */
   setConsignes(side: "home" | "away", consignes: Consignes): void {
     const ctx = side === "home" ? this.home : this.away;
@@ -195,9 +205,9 @@ export class MatchSession {
     const traitCtx: MatchTraitContext = { formation, period, isCrunch };
 
     const homeTargetsWeakApnee =
-      home.consignes.ciblage === "cibler-apnee" && weightedAvg(away.lineup, "apnee") < 11 ? 1.1 : 1;
+      home.consignes.ciblage === "cibler-apnee" && weightedAvg(away.lineup, "apnee") < CIBLAGE_APNEE_THRESHOLD ? 1.1 : 1;
     const awayTargetsWeakApnee =
-      away.consignes.ciblage === "cibler-apnee" && weightedAvg(home.lineup, "apnee") < 11 ? 1.1 : 1;
+      away.consignes.ciblage === "cibler-apnee" && weightedAvg(home.lineup, "apnee") < CIBLAGE_APNEE_THRESHOLD ? 1.1 : 1;
 
     const homeOffense = teamOffense(home, formation, bassin, period, traitCtx) * homeTargetsWeakApnee;
     const awayOffense = teamOffense(away, formation, bassin, period, traitCtx) * awayTargetsWeakApnee;
