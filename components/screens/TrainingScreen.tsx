@@ -5,6 +5,7 @@ import type { AttrKey } from "../../src/data/types";
 import { ATTR_KEYS } from "../../src/data/types";
 import { ATTR_LABELS } from "../trait-labels";
 import { applyCollectiveSession, applySpecificWork } from "../../src/engine/training";
+import { ATTR_INFO } from "../glossaryContent";
 import { formeLabel } from "./RosterScreen";
 
 const ATTR_SHORT: Record<AttrKey, string> = { cavite: "Cavité", apnee: "Apnée", anchois: "Anchois", discipline: "Discip.", souffle: "Souffle" };
@@ -90,6 +91,9 @@ export default function TrainingScreen({
             </button>
           ))}
         </div>
+        <p style={{ fontSize: ".72rem", color: "var(--text-dim)", margin: "8px 0 0" }}>
+          {ATTR_INFO[collectiveAttr].roleTag} — {ATTR_INFO[collectiveAttr].summary}
+        </p>
       </div>
 
       <div className="panel">
@@ -112,6 +116,9 @@ export default function TrainingScreen({
             </button>
           ))}
         </div>
+        <p style={{ fontSize: ".72rem", color: "var(--text-dim)", margin: "8px 0 0" }}>
+          {ATTR_INFO[specificAttr].roleTag} — {ATTR_INFO[specificAttr].summary}
+        </p>
       </div>
 
       <div className="panel">

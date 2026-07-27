@@ -7,6 +7,7 @@ import { MatchSession, type MatchResult } from "../../src/engine/match";
 import { createRng } from "../../src/engine/rng";
 import { DEFAULT_CONSIGNES } from "../../src/data/types";
 import type { Consignes, Tempo, Ciblage, DisciplineConsigne } from "../../src/data/types";
+import { TEMPO_INFO, CIBLAGE_INFO, DISCIPLINE_CONSIGNE_INFO } from "../glossaryContent";
 import Crest from "../Crest";
 
 function eventLabel(ev: { kind: string; side: string | null; homeDelta: number; awayDelta: number; period: number }): string {
@@ -116,19 +117,22 @@ export default function MatchLive({
         <div className="dossier" style={{ marginBottom: 14 }}>
           <div className="dossier__ref">{showConsignesPanel === "halftime" ? "MI-TEMPS" : "TEMPS MORT"}</div>
           <h3>Ajuster les consignes ?</h3>
-          <div className="segmented" style={{ marginBottom: 8 }}>
+          <div className="segmented" style={{ marginBottom: 4 }}>
             <button className={tempo === "prudent" ? "active" : ""} onClick={() => setTempo("prudent")}>Prudent</button>
             <button className={tempo === "equilibre" ? "active" : ""} onClick={() => setTempo("equilibre")}>Équilibré</button>
             <button className={tempo === "offensif" ? "active" : ""} onClick={() => setTempo("offensif")}>Offensif</button>
           </div>
-          <div className="segmented" style={{ marginBottom: 8 }}>
+          <p style={{ fontSize: ".7rem", color: "var(--text-dim)", margin: "0 0 8px" }}>{TEMPO_INFO[tempo].effect}</p>
+          <div className="segmented" style={{ marginBottom: 4 }}>
             <button className={ciblage === "cibler-apnee" ? "active" : ""} onClick={() => setCiblage("cibler-apnee")}>Cibler l'apnée</button>
             <button className={ciblage === "tenir-cavite" ? "active" : ""} onClick={() => setCiblage("tenir-cavite")}>Tenir la cavité</button>
           </div>
-          <div className="segmented" style={{ marginBottom: 12 }}>
+          <p style={{ fontSize: ".7rem", color: "var(--text-dim)", margin: "0 0 8px" }}>{CIBLAGE_INFO[ciblage].effect}</p>
+          <div className="segmented" style={{ marginBottom: 4 }}>
             <button className={discipline === "provoquer" ? "active" : ""} onClick={() => setDiscipline("provoquer")}>Provoquer</button>
             <button className={discipline === "jouer-propre" ? "active" : ""} onClick={() => setDiscipline("jouer-propre")}>Jouer propre</button>
           </div>
+          <p style={{ fontSize: ".7rem", color: "var(--text-dim)", margin: "0 0 12px" }}>{DISCIPLINE_CONSIGNE_INFO[discipline].effect}</p>
           <button className="btn btn--primary btn--sm" onClick={applyConsignesChange}>Confirmer et continuer</button>
         </div>
       )}

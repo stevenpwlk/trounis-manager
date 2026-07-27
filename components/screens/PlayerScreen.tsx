@@ -3,6 +3,7 @@ import type { GameState } from "../../lib/game";
 import { ATTR_KEYS } from "../../src/data/types";
 import RadarChart from "../RadarChart";
 import { TRAIT_LABELS, ATTR_LABELS } from "../trait-labels";
+import { ATTR_INFO } from "../glossaryContent";
 import { tireurValue } from "../../src/engine/mercato";
 import { formeLabel } from "./RosterScreen";
 
@@ -39,7 +40,11 @@ export default function PlayerScreen({ game, tireurId, onBack }: { game: GameSta
           <div className="radar-legend">
             {ATTR_KEYS.map((k) => (
               <div className="radar-legend__item" key={k}>
-                <span><span className="radar-legend__dot" />{ATTR_LABELS[k]}</span>
+                <span>
+                  <span className="radar-legend__dot" />
+                  {ATTR_LABELS[k]}
+                  <span style={{ color: "var(--text-dim)", fontSize: ".64rem" }}> ({ATTR_INFO[k].roleTag})</span>
+                </span>
                 <span className="radar-legend__val">{Math.round(t.attrs[k])}</span>
               </div>
             ))}

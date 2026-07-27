@@ -13,6 +13,7 @@ import MatchSynthesis from "./screens/MatchSynthesis";
 import MercatoScreen from "./screens/MercatoScreen";
 import SeasonEnd from "./screens/SeasonEnd";
 import VivierScreen from "./screens/VivierScreen";
+import GlossaryScreen from "./screens/GlossaryScreen";
 import { DashboardIcon, RosterIcon, MatchIcon, MercatoIcon, PlusIcon } from "./icons";
 import { useToast } from "./useToast";
 import { useTutorial } from "./tutorial/useTutorial";
@@ -34,6 +35,7 @@ type SubScreen =
   | { type: "live"; lineupIds: string[]; consignes: Consignes }
   | { type: "synthesis"; opponent: string; result: MatchResult; lineupIds: string[] }
   | { type: "season-end" }
+  | { type: "glossary" }
   | null;
 
 export default function GameApp() {
@@ -168,7 +170,14 @@ export default function GameApp() {
         <MatchPreview game={game} onOpenLineup={() => setSub({ type: "lineup" })} />
       )}
       {sub === null && tab === "mercato" && <MercatoScreen game={game} setGame={updateGame} toast={toast} />}
-      {sub === null && tab === "plus" && <PlusScreen game={game} onChangeWorld={backToWorldSelect} onReplayTutorial={tutorial.replay} />}
+      {sub === null && tab === "plus" && (
+        <PlusScreen
+          game={game}
+          onChangeWorld={backToWorldSelect}
+          onReplayTutorial={tutorial.replay}
+          onOpenGlossary={() => setSub({ type: "glossary" })}
+        />
+      )}
 
       {sub?.type === "player" && (
         <PlayerScreen game={game} tireurId={sub.id} onBack={() => setSub(null)} />
@@ -213,6 +222,7 @@ export default function GameApp() {
       {sub?.type === "season-end" && game.seasonReport && (
         <SeasonEnd game={game} onNextSeason={() => { updateGame(startNextSeason); setSub(null); }} />
       )}
+      {sub?.type === "glossary" && <GlossaryScreen onBack={() => setSub(null)} />}
 
       {showTabbar && (
         <nav className="tabbar">
@@ -307,10 +317,12 @@ function PlusScreen({
   game,
   onChangeWorld,
   onReplayTutorial,
+  onOpenGlossary,
 }: {
   game: GameState;
   onChangeWorld: () => void;
   onReplayTutorial: () => void;
+  onOpenGlossary: () => void;
 }) {
   return (
     <section className="screen">
@@ -350,6 +362,8 @@ function PlusScreen({
           Revoir les explications du Bureau sur l'entraînement, la composition, le match, le mercato et les fins de saison.
         </p>
         <button className="btn btn--ghost" onClick={onReplayTutorial}>Revoir le tutoriel</button>
+        <div className="gap-sm" />
+        <button className="btn btn--ghost" onClick={onOpenGlossary}>Lexique du Bureau (attributs & consignes)</button>
       </div>
     </section>
   );

@@ -8,6 +8,7 @@ import { pickLineup } from "../../src/engine/match";
 import { DEFAULT_CONSIGNES } from "../../src/data/types";
 import type { Consignes, Tempo, Ciblage, DisciplineConsigne } from "../../src/data/types";
 import { FORMATION_LABELS, BASSIN_LABELS } from "../trait-labels";
+import { TEMPO_INFO, CIBLAGE_INFO, DISCIPLINE_CONSIGNE_INFO } from "../glossaryContent";
 
 export default function LineupScreen({
   game,
@@ -89,6 +90,7 @@ export default function LineupScreen({
           <button className={tempo === "equilibre" ? "active" : ""} onClick={() => setTempo("equilibre")}>Équilibré</button>
           <button className={tempo === "offensif" ? "active" : ""} onClick={() => setTempo("offensif")}>Offensif</button>
         </div>
+        <p style={{ fontSize: ".72rem", color: "var(--text-dim)", margin: "8px 0 0" }}>{TEMPO_INFO[tempo].effect}</p>
       </div>
       <div className="panel">
         <h3>Ciblage</h3>
@@ -96,6 +98,7 @@ export default function LineupScreen({
           <button className={ciblage === "cibler-apnee" ? "active" : ""} onClick={() => setCiblage("cibler-apnee")}>Cibler l'apnée</button>
           <button className={ciblage === "tenir-cavite" ? "active" : ""} onClick={() => setCiblage("tenir-cavite")}>Tenir la cavité</button>
         </div>
+        <p style={{ fontSize: ".72rem", color: "var(--text-dim)", margin: "8px 0 0" }}>{CIBLAGE_INFO[ciblage].effect}</p>
       </div>
       <div className="panel">
         <h3>Discipline de jeu</h3>
@@ -103,6 +106,7 @@ export default function LineupScreen({
           <button className={discipline === "provoquer" ? "active" : ""} onClick={() => setDiscipline("provoquer")}>Provoquer</button>
           <button className={discipline === "jouer-propre" ? "active" : ""} onClick={() => setDiscipline("jouer-propre")}>Jouer propre</button>
         </div>
+        <p style={{ fontSize: ".72rem", color: "var(--text-dim)", margin: "8px 0 0" }}>{DISCIPLINE_CONSIGNE_INFO[discipline].effect}</p>
       </div>
 
       <button

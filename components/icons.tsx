@@ -34,3 +34,46 @@ export function PlusIcon() {
     </svg>
   );
 }
+
+/** Icônes des 5 attributs (Lexique du Bureau) — même style ligne-claire que les icônes d'onglets. */
+export function CaviteIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="4.2" />
+      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+export function ApneeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M12 3.5 19 6.5v5c0 5-3 8.3-7 9.5-4-1.2-7-4.5-7-9.5v-5Z" />
+    </svg>
+  );
+}
+export function AnchoisIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M2 12c4-5 10-7 14-5 2 1 3 3 3 5s-1 4-3 5c-4 2-10 0-14-5Z" />
+      <path d="M19 9l3-2.5M19 15l3 2.5" />
+      <circle cx="7.5" cy="10.5" r=".9" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+export function DisciplineIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <rect x="6" y="3" width="12" height="18" rx="1.5" transform="rotate(-8 12 12)" />
+    </svg>
+  );
+}
+export function SouffleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M3 8h11a2.5 2.5 0 1 0-2.2-3.6" />
+      <path d="M3 12.5h15a2.5 2.5 0 1 1-2.2 3.6" />
+      <path d="M3 17h9" />
+    </svg>
+  );
+}
