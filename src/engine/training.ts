@@ -1,4 +1,5 @@
 import type { AttrKey, Tireur } from "../data/types";
+import { trainingGainMultiplier, ombreDuVestiaireBonus, fatigueResistanceFactor } from "./traits-effects";
 
 /**
  * Les 3 gestes d'entraînement (§7). Attributs stockés en float en interne
@@ -37,14 +38,20 @@ function clampForme(value: number): number {
 /** Geste 1 : séance collective — tout l'effectif progresse un peu sur un attribut. */
 export function applyCollectiveSession(roster: Tireur[], attr: AttrKey): void {
   for (const t of roster) {
-    const gain = COLLECTIVE_BASE_GAIN * ageProgressionFactor(t.age) * diminishingFactor(t.attrs[attr]);
+    const gain =
+      COLLECTIVE_BASE_GAIN *
+      ageProgressionFactor(t.age) *
+      diminishingFactor(t.attrs[attr]) *
+      trainingGainMultiplier(t) *
+      ombreDuVestiaireBonus(roster, t);
     t.attrs[attr] = clampAttr(t.attrs[attr] + gain);
   }
 }
 
 /** Geste 2 : travail spécifique — un tireur ciblé progresse fortement sur un attribut. */
 export function applySpecificWork(tireur: Tireur, attr: AttrKey): void {
-  const gain = SPECIFIC_BASE_GAIN * ageProgressionFactor(tireur.age) * diminishingFactor(tireur.attrs[attr]);
+  const gain =
+    SPECIFIC_BASE_GAIN * ageProgressionFactor(tireur.age) * diminishingFactor(tireur.attrs[attr]) * trainingGainMultiplier(tireur);
   tireur.attrs[attr] = clampAttr(tireur.attrs[attr] + gain);
 }
 
@@ -55,7 +62,8 @@ export function applySpecificWork(tireur: Tireur, attr: AttrKey): void {
  */
 export function applyWeeklyRecovery(roster: Tireur[], restedId: string | null): void {
   for (const t of roster) {
-    const recovery = t.id === restedId ? REST_TARGETED_RECOVERY : REST_BASE_RECOVERY;
+    const base = t.id === restedId ? REST_TARGETED_RECOVERY : REST_BASE_RECOVERY;
+    const recovery = base * (2 - fatigueResistanceFactor(t)); // increvable/poumons-de-la-fosse récupèrent aussi plus vite
     t.forme = clampForme(t.forme + recovery);
   }
 }
@@ -63,6 +71,6 @@ export function applyWeeklyRecovery(roster: Tireur[], restedId: string | null): 
 /** Fatigue post-match : à appliquer aux tireurs alignés après simulation du match. */
 export function applyPostMatchFatigue(lineup: Tireur[], rng: { int(min: number, max: number): number }): void {
   for (const t of lineup) {
-    t.forme = clampForme(t.forme - rng.int(MATCH_FATIGUE_MIN, MATCH_FATIGUE_MAX));
+    t.forme = clampForme(t.forme - rng.int(MATCH_FATIGUE_MIN, MATCH_FATIGUE_MAX) * fatigueResistanceFactor(t));
   }
 }

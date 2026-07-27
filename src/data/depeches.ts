@@ -7,7 +7,7 @@ import type { MilestoneKind } from "../engine/match";
  * généré après chaque match à partir des milestones réels et, à l'occasion,
  * d'un résultat surprise ailleurs dans le monde. 1 à 2 par tour maximum.
  */
-export type DepecheFamille = "vestiaire" | "gazette";
+export type DepecheFamille = "vestiaire" | "gazette" | "bureau" | "mercato";
 
 const MILESTONE_TEMPLATES: Partial<Record<MilestoneKind, string[]>> = {
   comeback: [
@@ -45,6 +45,23 @@ const UPSET_TEMPLATES = [
   "Le Bureau s'étonne : {petit} a fait chuter {grand} ce tour-ci.",
 ];
 
+const BUREAU_TEMPLATES = [
+  "Le Bureau notifie {club} du passage à la formation-règlement en vigueur pour ce nouveau segment de saison.",
+  "Convocation administrative pour {club} : le Bureau rappelle les nouvelles consignes de formation avant le prochain coup d'envoi.",
+  "Le Bureau des Entraîneurs publie un rappel de règlement à l'attention de {club} pour ce changement de segment.",
+];
+
+const MERCATO_RUMOR_TEMPLATES = [
+  "La Gazette évoque un intérêt discret d'un club rival pour l'effectif de {club} en cette fenêtre de mercato.",
+  "Fenêtre ouverte : plusieurs agents libres auraient été aperçus en observation autour de {club}.",
+  "Rumeur de bordereau : {club} serait sur les rangs pour un renfort avant la fermeture de la fenêtre.",
+];
+
+const RETIREMENT_WARNING_TEMPLATES = [
+  "{tireur} évoque, entre deux séances, l'idée d'une dernière saison sous ce maillot.",
+  "Sans l'annoncer officiellement, {tireur} prépare le vestiaire à une page qui pourrait bientôt se tourner.",
+];
+
 function pickTemplate(templates: string[], seed: number): string {
   return templates[seed % templates.length]!;
 }
@@ -65,4 +82,16 @@ export function depecheForSaisine(club: string, adversaire: string, seed: number
 
 export function depecheForUpset(petit: string, grand: string, seed: number): string {
   return fillTemplate(pickTemplate(UPSET_TEMPLATES, seed), { petit, grand });
+}
+
+export function depecheForRetirementWarning(tireur: string, seed: number): string {
+  return fillTemplate(pickTemplate(RETIREMENT_WARNING_TEMPLATES, seed), { tireur });
+}
+
+export function depecheForBureau(club: string, seed: number): string {
+  return fillTemplate(pickTemplate(BUREAU_TEMPLATES, seed), { club });
+}
+
+export function depecheForMercatoRumeur(club: string, seed: number): string {
+  return fillTemplate(pickTemplate(MERCATO_RUMOR_TEMPLATES, seed), { club });
 }

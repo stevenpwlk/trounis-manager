@@ -4,6 +4,7 @@ import type { GameState } from "../../lib/game";
 import { getClub, CLUBS } from "../../src/data/clubs";
 import { tireurValue, proposeBuy, sellPrice, type OfferResult } from "../../src/engine/mercato";
 import { createRng } from "../../src/engine/rng";
+import { isMercatoOpen, nextMercatoWindowStart } from "../../src/engine/formations";
 import type { Tireur } from "../../src/data/types";
 import Crest from "../Crest";
 
@@ -19,6 +20,7 @@ export default function MercatoScreen({
   toast: (msg: string) => void;
 }) {
   const roster = game.rosters[game.clubCode]!;
+  const open = isMercatoOpen(game.journee);
   const [offerFor, setOfferFor] = useState<{ tireur: Tireur; clubCode: string } | null>(null);
   const [offerAmount, setOfferAmount] = useState(0);
   const [pendingCounter, setPendingCounter] = useState<number | null>(null);
@@ -110,63 +112,77 @@ export default function MercatoScreen({
         </div>
       </div>
 
-      <div className={`overlay ${offerFor ? "active" : ""}`} onClick={() => setOfferFor(null)}>
-        {offerFor && (
-          <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <Crest code={offerFor.clubCode} />
-              <span className="eyebrow" style={{ marginBottom: 0 }}>Offre — {getClub(offerFor.clubCode).name}</span>
-            </div>
-            <h3>{offerFor.tireur.name}</h3>
-            <p>Valeur estimée : {tireurValue(offerFor.tireur)} Ⱥ</p>
-            {pendingCounter === null ? (
-              <>
-                <input
-                  className="text-input"
-                  type="number"
-                  value={offerAmount}
-                  onChange={(e) => setOfferAmount(Number(e.target.value))}
-                />
-                <div className="sheet-actions">
-                  <button className="btn btn--primary btn--sm" onClick={submitOffer}>Proposer</button>
-                  <button className="btn btn--ghost btn--sm" onClick={() => setOfferFor(null)}>Annuler</button>
+      {!open ? (
+        <div className="dossier">
+          <div className="dossier__ref">BUREAU DE LA F.I.S.T. — FENÊTRE FERMÉE</div>
+          <h3>Le mercato est clos pour l'instant.</h3>
+          <p>
+            {nextMercatoWindowStart(game.journee)
+              ? `Réouverture à la journée ${nextMercatoWindowStart(game.journee)}.`
+              : "Plus aucune fenêtre cette saison — rendez-vous à l'intersaison."}
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className={`overlay ${offerFor ? "active" : ""}`} onClick={() => setOfferFor(null)}>
+            {offerFor && (
+              <div className="sheet" onClick={(e) => e.stopPropagation()}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                  <Crest code={offerFor.clubCode} />
+                  <span className="eyebrow" style={{ marginBottom: 0 }}>Offre — {getClub(offerFor.clubCode).name}</span>
                 </div>
-              </>
-            ) : (
-              <>
-                <p>Contre-offre du club : <strong>{pendingCounter} Ⱥ</strong> (à prendre ou à laisser).</p>
-                <div className="sheet-actions">
-                  <button className="btn btn--primary btn--sm" onClick={() => finalizeBuy(offerFor, pendingCounter)}>Accepter</button>
-                  <button className="btn btn--ghost btn--sm" onClick={() => setOfferFor(null)}>Refuser</button>
-                </div>
-              </>
+                <h3>{offerFor.tireur.name}</h3>
+                <p>Valeur estimée : {tireurValue(offerFor.tireur)} Ⱥ</p>
+                {pendingCounter === null ? (
+                  <>
+                    <input
+                      className="text-input"
+                      type="number"
+                      value={offerAmount}
+                      onChange={(e) => setOfferAmount(Number(e.target.value))}
+                    />
+                    <div className="sheet-actions">
+                      <button className="btn btn--primary btn--sm" onClick={submitOffer}>Proposer</button>
+                      <button className="btn btn--ghost btn--sm" onClick={() => setOfferFor(null)}>Annuler</button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p>Contre-offre du club : <strong>{pendingCounter} Ⱥ</strong> (à prendre ou à laisser).</p>
+                    <div className="sheet-actions">
+                      <button className="btn btn--primary btn--sm" onClick={() => finalizeBuy(offerFor, pendingCounter)}>Accepter</button>
+                      <button className="btn btn--ghost btn--sm" onClick={() => setOfferFor(null)}>Refuser</button>
+                    </div>
+                  </>
+                )}
+              </div>
             )}
           </div>
-        )}
-      </div>
 
-      <div className="panel">
-        <h3>Joueurs disponibles (autres clubs)</h3>
-        {candidates.map((c, i) => (
-          <div className="row" key={i}>
-            <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: ".78rem" }}>
-              <Crest code={c.clubCode} size="sm" />
-              {c.tireur.name} ({getClub(c.clubCode).name})
-            </span>
-            <button className="btn btn--ghost btn--sm" onClick={() => openOffer(c)}>Proposer</button>
+          <div className="panel">
+            <h3>Joueurs disponibles (autres clubs)</h3>
+            {candidates.map((c, i) => (
+              <div className="row" key={i}>
+                <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: ".78rem" }}>
+                  <Crest code={c.clubCode} size="sm" />
+                  {c.tireur.name} ({getClub(c.clubCode).name})
+                </span>
+                <button className="btn btn--ghost btn--sm" onClick={() => openOffer(c)}>Proposer</button>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      <div className="panel">
-        <h3>Vendre un tireur</h3>
-        {roster.map((t) => (
-          <div className="row" key={t.id}>
-            <span style={{ fontSize: ".78rem" }}>{t.name}</span>
-            <button className="btn btn--ghost btn--sm" onClick={() => sell(t)}>Vendre ({sellPrice(t)} Ⱥ)</button>
+          <div className="panel">
+            <h3>Vendre un tireur</h3>
+            {roster.map((t) => (
+              <div className="row" key={t.id}>
+                <span style={{ fontSize: ".78rem" }}>{t.name}</span>
+                <button className="btn btn--ghost btn--sm" onClick={() => sell(t)}>Vendre ({sellPrice(t)} Ⱥ)</button>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
     </section>
   );
 }

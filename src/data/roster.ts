@@ -75,7 +75,7 @@ function pickSpecialties(club: Club, rng: Rng, count: number): AttrKey[] {
   return result;
 }
 
-function generateAttributes(club: Club, rng: Rng): Attributes {
+export function generateAttributes(club: Club, rng: Rng): Attributes {
   // force 45 -> moyenne ~8 ; force 92 -> moyenne ~15.5 (échelle 1-20)
   const baseAvg = 8 + ((club.forceLore - 45) / 47) * 7.5;
   const specialtyCount = rng.chance(0.55) ? 1 : 2;

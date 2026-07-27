@@ -8,6 +8,15 @@ export const FORMATION_BY_SEASON: Record<SeasonSegment, FormationId> = {
   hiver: "carre-cercle",
 };
 
+/** Map inverse — utile aux effets de terroir saisonnier des traits (§15) qui ne connaissent
+ * que la formation en vigueur, pas directement le segment de saison. */
+export const SEGMENT_BY_FORMATION: Record<FormationId, SeasonSegment> = {
+  triangle: "printemps",
+  losange: "ete",
+  libre: "automne",
+  "carre-cercle": "hiver",
+};
+
 /** Nombre de tireurs alignés par formation (§5). Carré-en-cercle = 4 + 1 pivot. */
 export const SLOTS_BY_FORMATION: Record<FormationId, number> = {
   triangle: 3,
@@ -45,4 +54,21 @@ export function segmentForJournee(journee: number): SeasonSegment {
     if (journee <= acc) return seg;
   }
   throw new Error(`Journée hors calendrier: ${journee}`);
+}
+
+/** Les 2 fenêtres de mercato (§8) : la grande à l'intersaison (J1-2), la courte d'hiver
+ * juste avant la bascule automne→hiver (J14-15). Hors fenêtre, le mercato est fermé. */
+const MERCATO_WINDOWS: ReadonlyArray<readonly [number, number]> = [
+  [1, 2],
+  [14, 15],
+];
+
+export function isMercatoOpen(journee: number): boolean {
+  return MERCATO_WINDOWS.some(([start, end]) => journee >= start && journee <= end);
+}
+
+/** Prochaine journée d'ouverture du mercato, pour l'affichage ("fenêtre fermée, réouverture J.X"). */
+export function nextMercatoWindowStart(journee: number): number | null {
+  const next = MERCATO_WINDOWS.map(([start]) => start).find((start) => start > journee);
+  return next ?? null;
 }

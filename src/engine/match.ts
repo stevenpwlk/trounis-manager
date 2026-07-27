@@ -2,6 +2,7 @@ import type { AttrKey, ConditionsBassin, Consignes, FormationId, Tireur } from "
 import { FORMATION_WEIGHTS, SLOTS_BY_FORMATION, SOUFFLE_PERIOD_MULT } from "./formations";
 import { tacticsEffect, type TacticsEffect } from "./tactics";
 import { bassinEffect, type BassinEffect } from "./bassin";
+import { traitAttrValue, saisineTargetingBias, grandeGueuleTeamRiskBonus, type MatchTraitContext } from "./traits-effects";
 import type { Rng } from "./rng";
 
 export type MilestoneKind = "lead_change" | "equalizer" | "run" | "comeback" | "clutch" | "drought";
@@ -59,9 +60,10 @@ export function pickLineup(roster: Tireur[], formation: FormationId): Tireur[] {
   return scored.slice(0, n).map((s) => s.t);
 }
 
-function weightedAvg(lineup: Tireur[], key: AttrKey): number {
+function weightedAvg(lineup: Tireur[], key: AttrKey, ctx?: MatchTraitContext): number {
   if (lineup.length === 0) return 0;
-  return lineup.reduce((sum, t) => sum + t.attrs[key], 0) / lineup.length;
+  if (!ctx) return lineup.reduce((sum, t) => sum + t.attrs[key], 0) / lineup.length;
+  return lineup.reduce((sum, t) => sum + traitAttrValue(t, key, ctx), 0) / lineup.length;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -76,33 +78,34 @@ type TeamContext = {
   tactics: TacticsEffect;
 };
 
-function teamOffense(ctx: TeamContext, formation: FormationId, bassin: BassinEffect, period: number): number {
+function teamOffense(ctx: TeamContext, formation: FormationId, bassin: BassinEffect, period: number, traitCtx: MatchTraitContext): number {
   const w = FORMATION_WEIGHTS[formation];
   const cavite =
-    weightedAvg(ctx.lineup, "cavite") * w.cavite * (ctx.tactics.attackMult.cavite ?? 1) * bassin.caviteMult;
+    weightedAvg(ctx.lineup, "cavite", traitCtx) * w.cavite * (ctx.tactics.attackMult.cavite ?? 1) * bassin.caviteMult;
   const anchois =
-    weightedAvg(ctx.lineup, "anchois") * w.anchois * (ctx.tactics.attackMult.anchois ?? 1) * bassin.anchoisMult;
-  const souffle = weightedAvg(ctx.lineup, "souffle");
+    weightedAvg(ctx.lineup, "anchois", traitCtx) * w.anchois * (ctx.tactics.attackMult.anchois ?? 1) * bassin.anchoisMult;
+  const souffle = weightedAvg(ctx.lineup, "souffle", traitCtx);
   const souffleDeviation = (souffle - 10) / 10;
   const souffleBoost = 1 + souffleDeviation * w.souffle * SOUFFLE_PERIOD_MULT[period - 1]! * 0.22;
   return (cavite * 0.65 + anchois * 0.35) * souffleBoost;
 }
 
-function teamDefense(ctx: TeamContext, formation: FormationId, bassin: BassinEffect): number {
+function teamDefense(ctx: TeamContext, formation: FormationId, bassin: BassinEffect, traitCtx: MatchTraitContext): number {
   const w = FORMATION_WEIGHTS[formation];
-  return weightedAvg(ctx.lineup, "apnee") * w.apnee * (ctx.tactics.defenseMult.apnee ?? 1) * bassin.apneeMult;
+  return weightedAvg(ctx.lineup, "apnee", traitCtx) * w.apnee * (ctx.tactics.defenseMult.apnee ?? 1) * bassin.apneeMult;
 }
 
-function anchoisBonusChance(ctx: TeamContext, bassin: BassinEffect): number {
-  const anchois = weightedAvg(ctx.lineup, "anchois") * bassin.anchoisMult;
+function anchoisBonusChance(ctx: TeamContext, bassin: BassinEffect, traitCtx: MatchTraitContext): number {
+  const anchois = weightedAvg(ctx.lineup, "anchois", traitCtx) * bassin.anchoisMult;
   return clamp((anchois - 8) / 40, 0.02, 0.35);
 }
 
-function saisineChance(ctx: TeamContext, formation: FormationId, bassin: BassinEffect, isOpponentProvoking: boolean): number {
+function saisineChance(ctx: TeamContext, formation: FormationId, bassin: BassinEffect, isOpponentProvoking: boolean, traitCtx: MatchTraitContext): number {
   const w = FORMATION_WEIGHTS[formation];
-  const discipline = weightedAvg(ctx.lineup, "discipline") * bassin.disciplineMult;
+  const discipline = weightedAvg(ctx.lineup, "discipline", traitCtx) * bassin.disciplineMult;
   let base = clamp((14 - discipline) / 100, 0, 0.12) * w.discipline;
   base += ctx.tactics.ownSaisineRiskDelta;
+  base += grandeGueuleTeamRiskBonus(ctx.lineup, ctx.consignes.discipline === "provoquer");
   if (isOpponentProvoking) base += 0.06;
   return clamp(base, 0, 0.35);
 }
@@ -188,15 +191,18 @@ export class MatchSession {
     const period = this.currentPeriod + 1;
     const { home, away, bassin, formation, rng } = this;
 
+    const isCrunch = period === PERIODS && Math.abs(this.homeScore - this.awayScore) <= 6;
+    const traitCtx: MatchTraitContext = { formation, period, isCrunch };
+
     const homeTargetsWeakApnee =
       home.consignes.ciblage === "cibler-apnee" && weightedAvg(away.lineup, "apnee") < 11 ? 1.1 : 1;
     const awayTargetsWeakApnee =
       away.consignes.ciblage === "cibler-apnee" && weightedAvg(home.lineup, "apnee") < 11 ? 1.1 : 1;
 
-    const homeOffense = teamOffense(home, formation, bassin, period) * homeTargetsWeakApnee;
-    const awayOffense = teamOffense(away, formation, bassin, period) * awayTargetsWeakApnee;
-    const homeDefense = teamDefense(home, formation, bassin);
-    const awayDefense = teamDefense(away, formation, bassin);
+    const homeOffense = teamOffense(home, formation, bassin, period, traitCtx) * homeTargetsWeakApnee;
+    const awayOffense = teamOffense(away, formation, bassin, period, traitCtx) * awayTargetsWeakApnee;
+    const homeDefense = teamDefense(home, formation, bassin, traitCtx);
+    const awayDefense = teamDefense(away, formation, bassin, traitCtx);
 
     const homeMomentumFactor = 1 + clamp(this.momentum / 100, -0.15, 0.15);
     const awayMomentumFactor = 1 + clamp(-this.momentum / 100, -0.15, 0.15);
@@ -218,17 +224,19 @@ export class MatchSession {
       this.events.push({ period, kind: "deflector", side, homeDelta: 0, awayDelta: 0 });
     }
 
-    if (rng.chance(anchoisBonusChance(home, bassin))) {
+    if (rng.chance(anchoisBonusChance(home, bassin, traitCtx))) {
       homePts += 1;
       this.events.push({ period, kind: "anchois", side: "home", homeDelta: 1, awayDelta: 0 });
     }
-    if (rng.chance(anchoisBonusChance(away, bassin))) {
+    if (rng.chance(anchoisBonusChance(away, bassin, traitCtx))) {
       awayPts += 1;
       this.events.push({ period, kind: "anchois", side: "away", homeDelta: 0, awayDelta: 1 });
     }
 
-    if (!this.homeSaisined && rng.chance(saisineChance(home, formation, bassin, away.consignes.discipline === "provoquer"))) {
-      const target = [...home.lineup].sort((a, b) => a.attrs.discipline - b.attrs.discipline)[0];
+    if (!this.homeSaisined && rng.chance(saisineChance(home, formation, bassin, away.consignes.discipline === "provoquer", traitCtx))) {
+      const target = [...home.lineup].sort(
+        (a, b) => a.attrs.discipline + saisineTargetingBias(a, formation) - (b.attrs.discipline + saisineTargetingBias(b, formation))
+      )[0];
       if (target) {
         home.lineup = home.lineup.filter((t) => t.id !== target.id);
         this.homeSaisined = true;
@@ -236,8 +244,10 @@ export class MatchSession {
         this.events.push({ period, kind: "saisine", side: "home", homeDelta: 0, awayDelta: 0, tireurId: target.id });
       }
     }
-    if (!this.awaySaisined && rng.chance(saisineChance(away, formation, bassin, home.consignes.discipline === "provoquer"))) {
-      const target = [...away.lineup].sort((a, b) => a.attrs.discipline - b.attrs.discipline)[0];
+    if (!this.awaySaisined && rng.chance(saisineChance(away, formation, bassin, home.consignes.discipline === "provoquer", traitCtx))) {
+      const target = [...away.lineup].sort(
+        (a, b) => a.attrs.discipline + saisineTargetingBias(a, formation) - (b.attrs.discipline + saisineTargetingBias(b, formation))
+      )[0];
       if (target) {
         away.lineup = away.lineup.filter((t) => t.id !== target.id);
         this.awaySaisined = true;

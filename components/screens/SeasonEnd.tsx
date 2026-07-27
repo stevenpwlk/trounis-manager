@@ -15,7 +15,7 @@ const PROMOTION_LABEL: Record<string, { label: string; className: string }> = {
   maintien: { label: "Maintien", className: "pill--muted" },
 };
 
-export default function SeasonEnd({ game }: { game: GameState }) {
+export default function SeasonEnd({ game, onNextSeason }: { game: GameState; onNextSeason: () => void }) {
   if (!game.seasonReport) return null;
   const club = getClub(game.clubCode);
   const { finalRank, standing, objectivePalier, barrage, promotion, cup } = game.seasonReport;
@@ -102,10 +102,12 @@ export default function SeasonEnd({ game }: { game: GameState }) {
 
       <div className="panel">
         <p style={{ fontSize: ".78rem", color: "var(--text-dim)", margin: 0 }}>
-          La persistance multi-saisons (carrière, Panthéon, Vivier, mercato IA) arrive avec P3 — cette
-          maquette P2 démontre la boucle complète d'UNE saison, du choix du club au bilan final.
+          Saison {game.season} bouclée. Effectif vieilli d'un an, ligues redistribuées, calendrier
+          reconstruit — {club.name} repart pour la saison {game.season + 1}.
         </p>
       </div>
+
+      <button className="btn btn--primary" onClick={onNextSeason}>Saison suivante »</button>
     </section>
   );
 }

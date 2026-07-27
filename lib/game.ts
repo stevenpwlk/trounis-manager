@@ -1,10 +1,11 @@
 import type { AttrKey, ConditionsBassin, Consignes, FormationId, Tireur } from "../src/data/types";
 import { ATTR_KEYS, DEFAULT_CONSIGNES } from "../src/data/types";
 import { CLUBS, L1_CODES, L2_CODES, getClub } from "../src/data/clubs";
-import { generateClubRoster } from "../src/data/roster";
+import { generateClubRoster, generateAttributes } from "../src/data/roster";
+import { pickTraitWeighted } from "../src/data/traits";
 import { createRng } from "../src/engine/rng";
 import { generateDoubleRoundRobin, type Fixture } from "../src/engine/schedule";
-import { segmentForJournee, FORMATION_BY_SEASON } from "../src/engine/formations";
+import { segmentForJournee, FORMATION_BY_SEASON, isMercatoOpen } from "../src/engine/formations";
 import { randomConditions } from "../src/engine/bassin";
 import { simulateMatch, type MatchResult } from "../src/engine/match";
 import { createStandings, applyResult, sortedStandings, type StandingRow } from "../src/engine/standings";
@@ -12,7 +13,15 @@ import { evaluateObjective, type ObjectivePalier } from "../src/engine/objective
 import { applyPostMatchFatigue, applyWeeklyRecovery, applyCollectiveSession } from "../src/engine/training";
 import { simulateCup, type CupResult } from "../src/engine/cup";
 import type { Rng } from "../src/engine/rng";
-import { depecheForMilestone, depecheForSaisine, depecheForUpset } from "../src/data/depeches";
+import {
+  depecheForMilestone,
+  depecheForSaisine,
+  depecheForUpset,
+  depecheForRetirementWarning,
+  depecheForBureau,
+  depecheForMercatoRumeur,
+  type DepecheFamille,
+} from "../src/data/depeches";
 
 /**
  * Orchestration d'UNE saison jouable en solo (P2, §34) : le joueur dirige un
@@ -38,7 +47,7 @@ export type CupReport = {
   playerEliminatedBy: string | null; // code club, null si le joueur a gagné la Coupe ou n'a pas participé
 };
 
-export type Depeche = { id: string; journee: number; family: "vestiaire" | "gazette"; text: string };
+export type Depeche = { id: string; journee: number; family: DepecheFamille; text: string };
 
 export type SeasonReport = {
   finalRank: number;
@@ -53,6 +62,7 @@ export type SeasonReport = {
 export type GameState = {
   worldName: string;
   seed: string;
+  season: number; // 1, 2, 3... incrémenté à chaque startNextSeason (continuité multi-saison)
   clubCode: string;
   league: "L1" | "L2";
   budget: number;
@@ -93,6 +103,7 @@ export function createNewGame(worldName: string, clubCode: string, seed: string)
   return {
     worldName,
     seed,
+    season: 1,
     clubCode,
     league: club.league,
     budget: club.budget,
@@ -245,6 +256,12 @@ const MAX_DEPECHES = 40;
  * du match du joueur et, à l'occasion, d'un résultat surprise ailleurs dans le monde.
  * 1 à 2 dépêches par tour maximum, à appeler juste avant advanceJournee.
  */
+/** Le segment qui commence à cette journée précisément (nouvelle formation-règlement), ou null. */
+function segmentStartingAt(journee: number): boolean {
+  if (journee <= 1) return true;
+  return segmentForJournee(journee) !== segmentForJournee(journee - 1);
+}
+
 export function generateDepechesForJournee(state: GameState, playerResult: MatchResult, opponentCode: string): Depeche[] {
   const depeches: Depeche[] = [];
   const clubName = getClub(state.clubCode).name;
@@ -256,6 +273,17 @@ export function generateDepechesForJournee(state: GameState, playerResult: Match
   }
   if (playerResult.saisines.length > 0) {
     depeches.push({ id: `${state.journee}-saisine`, journee: state.journee, family: "vestiaire", text: depecheForSaisine(clubName, opponentName, state.journee) });
+  }
+
+  // Bureau de la F.I.S.T. : pousse davantage aux changements de segment de saison (§26) —
+  // nouvelle formation-règlement, moment naturel pour une convocation administrative.
+  if (segmentStartingAt(state.journee)) {
+    depeches.push({ id: `${state.journee}-bureau`, journee: state.journee, family: "bureau", text: depecheForBureau(clubName, state.journee) });
+  }
+
+  // Mercato & rumeurs : concentré sur les fenêtres ouvertes, quasi nul hors fenêtre (§8/§26).
+  if (isMercatoOpen(state.journee)) {
+    depeches.push({ id: `${state.journee}-mercato`, journee: state.journee, family: "mercato", text: depecheForMercatoRumeur(clubName, state.journee) });
   }
 
   // Un résultat surprise ailleurs dans le monde (hors le match du joueur), au plus une par tour.
@@ -394,6 +422,125 @@ function finalizeSeason(state: GameState): GameState {
       promotion,
       cup,
     },
+  };
+}
+
+/**
+ * Redistribution complète des 20 clubs entre L1/L2 pour la saison suivante (§9) : généralise
+ * à tout le monde la règle déjà appliquée au seul club du joueur par computePromotionStatus
+ * (2 montées/2 descentes directes + barrage). Nécessaire pour reconstruire un calendrier
+ * cohérent à la reprise (startNextSeason) — computePromotionStatus reste inchangée, elle sert
+ * uniquement à l'affichage du bilan du joueur.
+ */
+function computeLeagueReshuffle(state: GameState, barrage: BarrageReport): { l1: string[]; l2: string[] } {
+  const l1Table = state.standings.L1;
+  const l2Table = state.standings.L2;
+  const l1Stay = l1Table.slice(0, 7).map((r) => r.code); // rangs 1-7 : maintien direct
+  const eighthL1 = l1Table[7]!.code;
+  const l1Relegated = l1Table.slice(8, 10).map((r) => r.code); // rangs 9-10 : descente directe
+  const l2Promoted = l2Table.slice(0, 2).map((r) => r.code); // rangs 1-2 : montée directe
+  const thirdL2 = l2Table[2]!.code;
+  const l2Stay = l2Table.slice(3, 10).map((r) => r.code); // rangs 4-10 : maintien direct
+
+  const eighthL1Stays = barrage.winner === eighthL1;
+  return {
+    l1: [...l1Stay, eighthL1Stays ? eighthL1 : thirdL2, ...l2Promoted],
+    l2: [...l1Relegated, eighthL1Stays ? thirdL2 : eighthL1, ...l2Stay],
+  };
+}
+
+const RETIREMENT_FORCED_AGE = 36; // borne haute §6 ("Âge 18-36")
+const RETIREMENT_PROBABLE_FROM = 33; // probabilité croissante avant la borne forcée (préavis flou, §38)
+
+/**
+ * Vieillit tout le monde d'un an à la transition de saison et gère la retraite (§6/§38).
+ * Retraite minimale/placeholder (pas encore le vrai Vivier, §23/étape C) : un tireur qui part
+ * est remplacé au même id/poste par un jeune (18-20 ans) généré à neuf, même pattern que
+ * generateClubRoster. Ne retourne les noms des tireurs du joueur qui viennent d'entrer dans la
+ * zone à risque (34-35 ans, pas encore partis) que pour prévenir via une dépêche Vestiaire.
+ */
+function applyAgingAndRetirement(
+  rosters: Record<string, Tireur[]>,
+  rng: Rng,
+  playerClubCode: string
+): { rosters: Record<string, Tireur[]>; retirementWarnings: string[] } {
+  const nextRosters: Record<string, Tireur[]> = {};
+  const retirementWarnings: string[] = [];
+  for (const club of CLUBS) {
+    const roster = rosters[club.code]!;
+    nextRosters[club.code] = roster.map((t) => {
+      const age = t.age + 1;
+      const retireChance =
+        age >= RETIREMENT_FORCED_AGE ? 1 : age >= RETIREMENT_PROBABLE_FROM ? (age - RETIREMENT_PROBABLE_FROM + 1) * 0.25 : 0;
+      if (retireChance > 0 && rng.chance(retireChance)) {
+        return {
+          id: t.id,
+          name: t.name,
+          clubCode: club.code,
+          age: rng.int(18, 20),
+          attrs: generateAttributes(club, rng),
+          trait: pickTraitWeighted(rng),
+          isStar: false,
+          forme: 100,
+        } satisfies Tireur;
+      }
+      if (club.code === playerClubCode && (age === 34 || age === 35)) {
+        retirementWarnings.push(t.name);
+      }
+      return { ...t, age, forme: 100 }; // repos d'intersaison (§9 "temps fort"), avant la reprise
+    });
+  }
+  return { rosters: nextRosters, retirementWarnings };
+}
+
+/**
+ * Fait passer le monde à la saison suivante (§9 "jeu sans fin fixe", §10) : jusqu'ici
+ * SeasonEnd était un cul-de-sac (P2.5). Reconduit effectif (vieilli)/budget/dépêches,
+ * reconstruit ligues/calendrier/classements à zéro. Ne peut être appelée qu'après
+ * finalizeSeason (state.seasonReport doit être renseigné).
+ */
+export function startNextSeason(state: GameState): GameState {
+  if (!state.seasonReport) throw new Error("startNextSeason: aucune saison terminée à clôturer");
+  const season = state.season + 1;
+  const seed = `${state.seed}-s${season}`;
+  const rng = createRng(`${seed}-transition`);
+
+  const { l1, l2 } = computeLeagueReshuffle(state, state.seasonReport.barrage);
+  const league: "L1" | "L2" = l1.includes(state.clubCode) ? "L1" : "L2";
+
+  const { rosters, retirementWarnings } = applyAgingAndRetirement(state.rosters, rng, state.clubCode);
+
+  const playerCodes = league === "L1" ? l1 : l2;
+  const otherCodes = league === "L1" ? l2 : l1;
+  const fixtures = generateDoubleRoundRobin(playerCodes);
+  const otherFixtures = generateDoubleRoundRobin(otherCodes);
+  const standings = { L1: sortedStandings(createStandings(l1)), L2: sortedStandings(createStandings(l2)) };
+
+  const retirementDepeches: Depeche[] = retirementWarnings.map((name, i) => ({
+    id: `s${season}-retirement-${i}`,
+    journee: 1,
+    family: "vestiaire",
+    text: depecheForRetirementWarning(name, season * 7 + i),
+  }));
+
+  return {
+    ...state,
+    season,
+    seed,
+    league,
+    journee: 1,
+    rosters,
+    fixtures,
+    otherFixtures,
+    standings,
+    playedResults: [],
+    otherPlayedResults: [],
+    depeches: [...retirementDepeches, ...state.depeches].slice(0, MAX_DEPECHES),
+    trainingDoneThisJournee: false,
+    restedTireurId: null,
+    lastMatchResult: null,
+    lastMatchOpponent: null,
+    seasonReport: null,
   };
 }
 

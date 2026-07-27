@@ -1,6 +1,7 @@
 import type { Tireur } from "../data/types";
 import { ATTR_KEYS } from "../data/types";
 import type { Rng } from "./rng";
+import { traitValueMultiplier, traitStubbornnessMultiplier } from "./traits-effects";
 
 /**
  * Valeur estimée d'un tireur (§8) : dérivée des attributs, pondérée par
@@ -13,7 +14,7 @@ export function tireurValue(t: Tireur): number {
   const ageFactor = ageValueFactor(t.age);
   const formeFactor = 0.7 + (t.forme / 100) * 0.3;
   const starPremium = t.isStar ? 1.4 : 1;
-  return Math.round(attrSum * 0.9 * ageFactor * formeFactor * starPremium);
+  return Math.round(attrSum * 0.9 * ageFactor * formeFactor * starPremium * traitValueMultiplier(t));
 }
 
 function ageValueFactor(age: number): number {
@@ -36,7 +37,7 @@ export type OfferResult =
  */
 export function proposeBuy(tireur: Tireur, offer: number, opts: { richClub: boolean; rng: Rng }): OfferResult {
   const value = tireurValue(tireur);
-  const surcote = opts.richClub ? 1.2 : 1.0;
+  const surcote = (opts.richClub ? 1.2 : 1.0) * traitStubbornnessMultiplier(tireur);
   const askingPrice = Math.round(value * surcote);
 
   if (offer >= askingPrice) return { outcome: "accepted", price: offer };

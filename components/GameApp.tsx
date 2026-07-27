@@ -19,7 +19,7 @@ import Crest from "./Crest";
 import { getClub } from "../src/data/clubs";
 import { getSupabaseBrowserClient } from "../lib/supabase/client";
 import { saveCloudSlot } from "../lib/supabase/saves";
-import { currentFixture, currentFormation, type GameState } from "../lib/game";
+import { currentFixture, currentFormation, startNextSeason, type GameState } from "../lib/game";
 import type { Consignes, FormationId } from "../src/data/types";
 import type { MatchResult } from "../src/engine/match";
 
@@ -120,7 +120,7 @@ export default function GameApp() {
     <div className="app-shell">
       {sub === null && tab === "dashboard" && (
         game.seasonReport ? (
-          <SeasonEnd game={game} />
+          <SeasonEnd game={game} onNextSeason={() => updateGame(startNextSeason)} />
         ) : (
           <Dashboard
             game={game}
@@ -178,7 +178,9 @@ export default function GameApp() {
           }}
         />
       )}
-      {sub?.type === "season-end" && game.seasonReport && <SeasonEnd game={game} />}
+      {sub?.type === "season-end" && game.seasonReport && (
+        <SeasonEnd game={game} onNextSeason={() => { updateGame(startNextSeason); setSub(null); }} />
+      )}
 
       {showTabbar && (
         <nav className="tabbar">
