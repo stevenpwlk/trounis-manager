@@ -45,6 +45,19 @@ function attrAvg(attrs: Attributes): number {
 }
 
 /**
+ * Pioche un nom encore libre pour un tireur issu du Vivier qui prend sa retraite
+ * (§9/§38) — contrairement aux 200 slots canoniques, dont le nom reste attaché au
+ * poste à vie (identité de "maillot retiré"), un tireur du Vivier est un individu
+ * ordinaire : son nom doit repartir dans le pool commun pour rester recyclable
+ * indéfiniment, plutôt que de rester verrouillé pour toujours (cf. lib/game.ts
+ * applyAgingAndRetirement).
+ */
+export function pickFreshProspectName(rng: Rng, excluded: ReadonlySet<string>): string {
+  const available = PROSPECT_NAME_POOL.filter((name) => !excluded.has(name));
+  return available.length > 0 ? rng.pick(available) : rng.pick(PROSPECT_NAME_POOL);
+}
+
+/**
  * Ajoute un tireur signé à un effectif IA déjà au plafond de 10 (le cas courant — la
  * génération d'effectif et le remplacement des retraites maintiennent tout le monde à
  * 10 en permanence, cf. étape D) en libérant son non-star le plus faible plutôt que de

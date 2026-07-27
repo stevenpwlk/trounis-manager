@@ -26,7 +26,7 @@ import {
   depecheForClosureSigning,
   type DepecheFamille,
 } from "../src/data/depeches";
-import { generateVivierPool, resolveHiddenSignings, prospectSigningFee, signIntoRoster, type Prospect } from "../src/data/vivier";
+import { generateVivierPool, resolveHiddenSignings, prospectSigningFee, signIntoRoster, pickFreshProspectName, type Prospect } from "../src/data/vivier";
 
 /**
  * Orchestration d'UNE saison jouable en solo (P2, §34) : le joueur dirige un
@@ -542,6 +542,12 @@ const RETIREMENT_PROBABLE_FROM = 33; // probabilité croissante avant la borne f
  * est remplacé au même id/poste par un jeune (18-20 ans) généré à neuf, même pattern que
  * generateClubRoster. Ne retourne les noms des tireurs du joueur qui viennent d'entrer dans la
  * zone à risque (34-35 ans, pas encore partis) que pour prévenir via une dépêche Vestiaire.
+ *
+ * Nom conservé à vie UNIQUEMENT pour les 200 slots canoniques d'origine (identité de poste,
+ * "maillot retiré", repérable via l'id `${clubCode}-${index}` posé par generateClubRoster) —
+ * un tireur issu du Vivier (`id` contenant `-vivier-`) est un individu ordinaire : à sa retraite,
+ * son nom repart dans le pool commun et il est remplacé par un nom neuf, sans quoi la banque de
+ * noms de réserve se verrouillerait définitivement saison après saison (cf. [[reserve-names]]).
  */
 function applyAgingAndRetirement(
   rosters: Record<string, Tireur[]>,
@@ -550,6 +556,7 @@ function applyAgingAndRetirement(
 ): { rosters: Record<string, Tireur[]>; retirementWarnings: string[] } {
   const nextRosters: Record<string, Tireur[]> = {};
   const retirementWarnings: string[] = [];
+  const namesInUse = new Set(Object.values(rosters).flat().map((t) => t.name));
   for (const club of CLUBS) {
     const roster = rosters[club.code]!;
     nextRosters[club.code] = roster.map((t) => {
@@ -557,9 +564,15 @@ function applyAgingAndRetirement(
       const retireChance =
         age >= RETIREMENT_FORCED_AGE ? 1 : age >= RETIREMENT_PROBABLE_FROM ? (age - RETIREMENT_PROBABLE_FROM + 1) * 0.25 : 0;
       if (retireChance > 0 && rng.chance(retireChance)) {
+        let name = t.name;
+        if (t.id.includes("-vivier-")) {
+          namesInUse.delete(t.name);
+          name = pickFreshProspectName(rng, namesInUse);
+          namesInUse.add(name);
+        }
         return {
           id: t.id,
-          name: t.name,
+          name,
           clubCode: club.code,
           age: rng.int(18, 20),
           attrs: generateAttributes(club, rng),
